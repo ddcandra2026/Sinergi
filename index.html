@@ -290,16 +290,21 @@ window.dbDisconnect = function() { window.dbDisableAutoSync(); showToast('Mode o
 
 // ── Role UI applier ──
 function updateRoleBadge() {
-  const role = window._myRole;
-  const name = window._myName;
-  const badge = document.getElementById('role-badge-global');
-  const icons = { viewer:'👁️', pengurus:'⚙️', walikelas:'👩‍🏫' };
-  const labels = { viewer:'Siswa (Viewer)', pengurus:'Pengurus Kelas', walikelas:'Wali Kelas' };
-  const colors = { viewer:'rgba(99,102,241,.25)', pengurus:'rgba(78,205,196,.25)', walikelas:'rgba(255,107,107,.25)' };
-  if (badge) {
-    badge.innerHTML = `<span style="font-size:14px">${icons[role]||'👤'}</span> <span style="font-size:11px;font-weight:700">${name}</span> <span style="font-size:10px;opacity:.7">(${labels[role]||role})</span>`;
-    badge.style.background = colors[role] || 'rgba(255,255,255,.1)';
-  }
+  const role = window._myRole || 'viewer';
+  const name = window._myName || 'Siswa';
+  const badge  = document.getElementById('role-badge-global');
+  const bName  = document.getElementById('badge-name');
+  const bRole  = document.getElementById('badge-role');
+  const icons  = { viewer:'👁️', pengurus:'⚙️', walikelas:'👩‍🏫' };
+  const labels = { viewer:'Ketuk untuk login', pengurus:'Pengurus Kelas ✓', walikelas:'Wali Kelas ✓' };
+  const colors = {
+    viewer:   'rgba(99,102,241,.35)',
+    pengurus: 'rgba(78,205,196,.35)',
+    walikelas:'rgba(255,107,107,.35)'
+  };
+  if(badge) badge.style.background = colors[role] || 'rgba(255,255,255,.15)';
+  if(bName) bName.textContent = (role==='viewer'?'Siswa':name) + ' ' + (icons[role]||'👤');
+  if(bRole) bRole.textContent = labels[role] || role;
 }
 window.updateRoleBadge = updateRoleBadge;
 
@@ -676,22 +681,34 @@ select.input-field option{background:#1a1740;color:#fff}
 .icon-edit-item .ie-left{display:flex;align-items:center;gap:10px}
 .icon-edit-item .ie-icon{font-size:22px;width:40px;height:40px;border-radius:12px;background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid var(--border)}
 .icon-edit-item .ie-name{font-size:13px;font-weight:700;color:var(--text)}
-/* ── Desktop: phone frame di tengah ── */
-@media(min-width:480px){
+/* ── Mobile-first: full screen on phone, phone frame on big desktop ── */
+
+/* Tablets & small desktop (480px-899px): just center with max-width, no frame */
+@media(min-width:480px) and (max-width:899px){
+  #app{max-width:480px;margin:0 auto}
+  .bottom-nav{max-width:480px;left:50%;transform:translateX(-50%)}
+  .chat-room{max-width:480px;left:50%;transform:translateX(-50%)}
+  .overlay .bottom-sheet,.cfg-overlay .cfg-shell{max-width:480px;margin:0 auto}
+  .kal-detail-overlay .kal-detail-box,.pres-si-overlay .pres-si-box{max-width:480px}
+  #overlay-role-panel > div{max-width:480px;margin:0 auto}
+  #role-badge-global{right:calc(50% - 232px)}
+}
+
+/* Big desktop (900px+): phone frame centered */
+@media(min-width:900px){
   body{
     background:linear-gradient(135deg,#0a0820 0%,#0f0c29 100%);
     display:flex;align-items:center;justify-content:center;
     min-height:100vh;overflow:auto
   }
   #app{
-    max-width:390px;width:390px;height:844px;max-height:100vh;
+    max-width:390px;width:390px;height:844px;max-height:96vh;
     margin:0 auto;border-radius:40px;overflow:hidden;
-    box-shadow:0 0 0 1px rgba(255,255,255,.1),
+    box-shadow:0 0 0 1px rgba(255,255,255,.12),
                0 30px 80px rgba(0,0,0,.8),
                0 0 120px rgba(255,107,107,.08);
     position:relative
   }
-  /* Phone notch decoration */
   #app::before{
     content:'';position:absolute;top:14px;left:50%;transform:translateX(-50%);
     width:90px;height:5px;background:rgba(255,255,255,.15);border-radius:10px;z-index:999;pointer-events:none
@@ -702,16 +719,10 @@ select.input-field option{background:#1a1740;color:#fff}
     border-radius:0 0 40px 40px
   }
   .chat-room{max-width:390px;left:50%;transform:translateX(-50%)}
-  .overlay{align-items:flex-end}
-  .overlay .bottom-sheet{max-width:390px;margin:0 auto}
-  .cfg-overlay .cfg-shell{max-width:390px;margin:0 auto}
-  .kal-detail-overlay .kal-detail-box{max-width:390px}
-  .pres-si-overlay .pres-si-box{max-width:390px}
-  #overlay-role-panel{align-items:flex-end}
+  .overlay .bottom-sheet,.cfg-overlay .cfg-shell{max-width:390px;margin:0 auto}
+  .kal-detail-overlay .kal-detail-box,.pres-si-overlay .pres-si-box{max-width:390px}
   #overlay-role-panel > div{max-width:390px;margin:0 auto}
-  #overlay-rules-info{max-width:390px}
   #role-badge-global{right:calc(50% - 182px)}
-  /* Desktop background decoration */
   body::before{
     content:'KELAS 11 TEKNOLOGI';
     position:fixed;top:20px;left:50%;transform:translateX(-50%);
@@ -726,9 +737,6 @@ select.input-field option{background:#1a1740;color:#fff}
     pointer-events:none;z-index:0;letter-spacing:.5px
   }
 }
-@media(min-width:900px){
-  #app{height:90vh;max-height:844px}
-}
 
 @keyframes pulse-dot {
   0%,100%{opacity:1;transform:scale(1)}
@@ -738,6 +746,22 @@ select.input-field option{background:#1a1740;color:#fff}
   body::before, body::after { display:none !important }
   #app { border-radius:0 !important; box-shadow:none !important }
 }
+
+/* ── Mobile touch improvements ── */
+button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
+.card[onclick], div[onclick], .btn {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+/* Prevent text selection on tap */
+.bottom-nav, .qa, .itab { user-select:none; -webkit-user-select:none; }
+/* Smooth scroll */
+#scroll-area { scroll-behavior: smooth; }
+/* Fix iOS momentum scroll */
+#scroll-area { -webkit-overflow-scrolling: touch; }
+/* Overlay backdrop */
+#overlay-role-panel { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 </style>
 </head>
 <body>
@@ -764,9 +788,9 @@ select.input-field option{background:#1a1740;color:#fff}
           </div>
           <!-- Avatar kanan -->
           <div class="avt-row">
-            <div class="avt">RK</div>
-            <div class="avt">DN</div>
-            <div class="avt" style="font-size:9px">+32</div>
+            <div class="avt"/div>
+            <div class="avt"/div>
+            <div class="avt" style="font-size:9px"/div>
           </div>
         </div>
         <div class="hero-stats">
@@ -1268,13 +1292,20 @@ select.input-field option{background:#1a1740;color:#fff}
   <div id="role-badge-global" onclick="showRolePanel()"
     style="position:fixed;top:10px;right:12px;z-index:80;
       display:flex;align-items:center;gap:6px;
-      padding:6px 12px;border-radius:20px;
-      background:rgba(99,102,241,.25);
-      border:1px solid rgba(255,255,255,.15);
-      backdrop-filter:blur(10px);cursor:pointer;transition:all .2s">
-    <span style="font-size:14px">👁️</span>
-    <span style="font-size:11px;font-weight:700;color:#fff">Siswa</span>
-    <span style="font-size:10px;color:rgba(255,255,255,.6)">(Viewer)</span>
+      padding:7px 14px;border-radius:20px;
+      background:rgba(99,102,241,.35);
+      border:1px solid rgba(255,255,255,.2);
+      backdrop-filter:blur(12px);cursor:pointer;
+      transition:all .2s;
+      box-shadow:0 4px 16px rgba(0,0,0,.4);
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation">
+    <span style="font-size:15px">👁️</span>
+    <div>
+      <div style="font-size:12px;font-weight:800;color:#fff;line-height:1" id="badge-name">Siswa</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.6);line-height:1;margin-top:2px" id="badge-role">Ketuk untuk login</div>
+    </div>
+    <span style="font-size:14px;color:rgba(255,255,255,.5);margin-left:2px">›</span>
   </div>
 
   <!-- ══════ LOGIN / ROLE PANEL ══════ -->
@@ -4148,9 +4179,11 @@ function renderDashTugasPreview(){
 function updateDashStats(){
   const elS=document.getElementById('stat-total-siswa');
   const elH=document.getElementById('stat-hadir');
+  const elAvt=document.getElementById('avt-total');
   if(elS)elS.textContent=dataSiswa.length||0;
+  if(elAvt)elAvt.textContent=dataSiswa.length+' siswa';
   const hc=Object.values(absensiHariIni).filter(v=>v==='H').length;
-  if(elH)elH.textContent=hc||dataSiswa.length;
+  if(elH)elH.textContent=hc||dataSiswa.length||0;
 }
 
 // ════════════════════════════════════════════════════
@@ -4159,8 +4192,14 @@ function updateDashStats(){
 
 // ── Login / Logout ──
 function showRolePanel() {
-  document.getElementById('overlay-role-panel').style.display = 'flex';
+  const ov = document.getElementById('overlay-role-panel');
+  if(ov){ ov.style.display='flex'; ov.style.zIndex='500'; }
   refreshRolePanelUI();
+  // Scroll role form into view on mobile
+  setTimeout(()=>{
+    const form = document.getElementById('login-kode');
+    if(form && window._myRole==='viewer') form.focus();
+  }, 400);
 }
 function closeRolePanel(e) {
   if (e.target.id === 'overlay-role-panel')
