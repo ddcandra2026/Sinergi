@@ -770,8 +770,8 @@ select.input-field option{background:#1a1740;color:#fff}
           </div>
         </div>
         <div class="hero-stats">
-          <div class="hstat"><div class="hval" id="db-total-siswa">34</div><div class="hlbl">Siswa</div></div>
-          <div class="hstat"><div class="hval" id="db-hadir">32</div><div class="hlbl">Hadir Hari Ini</div></div>
+          <div class="hstat"><div class="hval" id="db-total-siswa">0</div><div class="hlbl">Siswa</div></div>
+          <div class="hstat"><div class="hval" id="db-hadir">0</div><div class="hlbl">Hadir Hari Ini</div></div>
           <div class="hstat"><div class="hval" id="db-avg-nilai">—</div><div class="hlbl">Avg Nilai</div></div>
         </div>
       </div>
@@ -786,31 +786,12 @@ select.input-field option{background:#1a1740;color:#fff}
         <div class="qa" onclick="showSheet('sheet-pengaturan')"><span class="qa-icon">⚙️</span><div class="qa-lbl">Pengaturan</div></div>
       </div>
       <div class="sec-title"><i class="ti ti-bell"></i> Pengumuman Terbaru</div>
-      <div class="card">
-        <div class="peng-top">
-          <div class="peng-ava" style="background:linear-gradient(135deg,#FF6B6B,#FF8E53)">R</div>
-          <div><div class="peng-by">—</div><div class="peng-date">—</div></div>
-          <span class="badge b-red" style="margin-left:auto">Penting</span>
-        </div>
-        <div class="peng-title">Pembayaran Kas Bulan Juni</div>
-        <div class="peng-body">Reminder! Pembayaran kas kelas bulan Juni paling lambat Jumat, 20 Juni 2025. Hubungi bendahara kelas. 🙏</div>
-      </div>
+      <div id="dash-peng-preview"></div>
       <div class="sec-title"><i class="ti ti-clipboard-list"></i> Tugas Deadline Dekat</div>
-      <div class="tugas-item">
-        <div class="tcheck" onclick="toggleCheck(this)"><i class="ti ti-check"></i></div>
-        <div class="tugas-body">
-          <div class="tname">Laporan Praktikum Jaringan Komputer</div>
-          <div class="tmeta">Pak Budi · Informatika</div>
-        </div>
-        <span class="badge b-red">Besok</span>
+      <div id="dash-tugas-preview"></div>
+              <span class="badge b-red">Besok</span>
       </div>
-      <div class="tugas-item">
-        <div class="tcheck done" onclick="toggleCheck(this)"><i class="ti ti-check"></i></div>
-        <div class="tugas-body">
-          <div class="tname" style="text-decoration:line-through;color:var(--text3)">Essay Revolusi Industri 4.0</div>
-          <div class="tmeta">Bu Sari · Bahasa Indonesia</div>
-        </div>
-        <span class="badge b-green">Selesai</span>
+      
       </div>
       <div class="watermark">Supported by <span>D.D Candra 2026</span></div>
     </div>
@@ -1559,16 +1540,7 @@ select.input-field option{background:#1a1740;color:#fff}
     <div class="row2">
       <div class="input-group">
         <label class="input-label">Mata Pelajaran</label>
-        <select class="input-field" id="tugas-mapel-inp">
-          <option>Informatika – Pak Budi</option>
-          <option>Matematika – Pak Hendra</option>
-          <option>Bahasa Indonesia – Bu Sari</option>
-          <option>Fisika – Pak Rudi</option>
-          <option>PKK – Bu Wati</option>
-          <option>Desain Grafis – Pak Andi</option>
-          <option>Bahasa Inggris – Bu Dewi</option>
-          <option>Lainnya</option>
-        </select>
+        <input type="text" class="input-field" id="tugas-mapel-inp" placeholder="Mata pelajaran & nama guru...">
       </div>
       <div class="input-group">
         <label class="input-label">Prioritas</label>
@@ -2276,8 +2248,7 @@ let kasTransaksi=[];
 
 // Nilai data — managed by renderNilai()
 
-const jadwalData={'0':[],'1':[],'2':[],'3':[],'4':[],'5':[],'6':[]};  ],
-};
+const jadwalData={'0':[],'1':[],'2':[],'3':[],'4':[],'5':[],'6':[]};
 
 let tugasData=[];
 
@@ -3576,49 +3547,7 @@ function hapusNilai(id){
 // ═══════════════════════════════════════════
 // TUGAS  
 // ═══════════════════════════════════════════
-function switchItabTugas(el,filter){
-  document.querySelectorAll('#panel-tugas .itab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
-  tugasFilter=filter;renderTugas();
-}
 
-function renderTugas(){
-  const list=document.getElementById('tugas-list');
-  let filtered=tugasData;
-  if(tugasFilter==='aktif')filtered=tugasData.filter(t=>!t.done);
-  if(tugasFilter==='selesai')filtered=tugasData.filter(t=>t.done);
-  // Sort: aktif dulu (belum selesai), lalu deadline
-  filtered=[...filtered].sort((a,b)=>{
-    if(a.done!==b.done)return a.done?1:-1;
-    const prOrder={high:0,normal:1,low:2};
-    return(prOrder[a.prioritas]||1)-(prOrder[b.prioritas]||1);
-  });
-  list.innerHTML=filtered.map(t=>{
-    const prColor=t.prioritas==='high'?'b-red':t.prioritas==='low'?'b-green':'b-yellow';
-    const prLabel=t.prioritas==='high'?'Tinggi':t.prioritas==='low'?'Rendah':'Normal';
-    return`<div class="tugas-item" id="tugas-${t.id}">
-      <div class="tcheck${t.done?' done':''}" onclick="toggleTugas(${t.id})"><i class="ti ti-check"></i></div>
-      <div class="tugas-body">
-        <div class="tname"${t.done?' style="text-decoration:line-through;color:var(--text3)"':''}>${t.nama}</div>
-        <div class="tmeta">${t.mapel} · ⏰ ${t.deadline}</div>
-        ${t.desc?`<div class="tdesc">${t.desc}</div>`:''}
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        <span class="badge ${prColor}">${prLabel}</span>
-        <button class="btn btn-xs btn-ghost" onclick="hapusTugas(${t.id})" style="color:#f87171;font-size:10px">🗑</button>
-      </div>
-    </div>`;
-  }).join('')||`<div class="card" style="text-align:center;padding:32px">
-    <div style="font-size:40px;margin-bottom:12px">${tugasFilter==='selesai'?'🎉':'📭'}</div>
-    <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:700;color:#fff">${tugasFilter==='selesai'?'Belum ada yang selesai':'Tidak ada tugas aktif'}</div>
-    <div style="font-size:12px;color:var(--text3);margin-top:6px">${tugasFilter==='selesai'?'Selesaikan tugasmu dulu!':'Klik tombol + di atas untuk tambah tugas'}</div>
-  </div>`;
-
-  // Update dashboard
-  const aktif=tugasData.filter(t=>!t.done).length;
-  const dbTugas=document.getElementById('db-tugas-count');
-  if(dbTugas)dbTugas.textContent=aktif;
-}
 
 function tambahTugas(){
   const nama=document.getElementById('tugas-nama-inp').value.trim();
@@ -3643,16 +3572,10 @@ function tambahTugas(){
   showToast('✅ Tugas "'+nama.substring(0,20)+(nama.length>20?'…':'')+'" ditambahkan!');
 }
 
-function toggleTugas(id){
-  const t=tugasData.find(x=>x.id===id);
-  if(t){t.done=!t.done;renderTugas();showToast(t.done?'✅ Tugas selesai!':'↩️ Tugas dibuka kembali');}
-}
 function hapusTugas(id){
   const idx=tugasData.findIndex(x=>x.id===id);
   if(idx>-1){const n=tugasData[idx].nama;tugasData.splice(idx,1);renderTugas();showToast('🗑 Tugas dihapus');}
 }
-function toggleCheck(el){el.classList.toggle('done')}
-
 // ═══════════════════════════════════════════
 // PENGUMUMAN  
 // ═══════════════════════════════════════════
@@ -4166,19 +4089,11 @@ function cfgResetTema(){
 }
 
 // ── Backward compat stubs ──
-function switchSetTab(el,tabId){
-  const map={'st-identitas':'identitas','st-ikon':'ikon','st-tema':'tema','st-database':'database'};
-  cfgGoTab(map[tabId]||'identitas');
-}
-function simpanIdentitas(){cfgSimpan();}
-function renderIconEditList(){cfgRenderIconCards();}
 function bukaEmojiPicker(key,label){cfgBukaEmoji(key,label);}
 function pilihEmoji(emoji){cfgPilihEmoji(emoji);}
 function pilihTema(el){cfgPilihTema(el);}
 function pilihBg(el,bg,bg2,bg3){cfgPilihBg(el,bg,bg2,bg3);}
 function resetTema(){cfgResetTema();}
-function prefillIdentitas(){cfgPrefill();}
-
 // Apply config on load
 applyConfig();
 prefillIdentitas();
@@ -4189,12 +4104,54 @@ renderTugas();
 renderNilai();
 renderTopikList();
 renderPengumuman();
+renderDashPengPreview();
+renderDashTugasPreview();
+updateDashStats();
 initJadwal();
 initKalender();
 renderAbsenList();
 renderDaftarSiswa();
 
 
+
+// ── Dashboard dynamic preview helpers ──
+function renderDashPengPreview(){
+  const el=document.getElementById('dash-peng-preview');if(!el)return;
+  if(!pengumumanData||pengumumanData.length===0){
+    el.innerHTML='<div style="background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.15);border-radius:16px;padding:24px;text-align:center;color:rgba(255,255,255,.35);font-size:13px"><div style="font-size:28px;margin-bottom:8px">📢</div>Belum ada pengumuman</div>';
+    return;
+  }
+  const p=pengumumanData[0];
+  el.innerHTML=`<div class="card" style="cursor:pointer" onclick="goTo('pengumuman')">
+    <div class="peng-top">
+      <div class="peng-ava" style="background:${p.warna||'linear-gradient(135deg,#FF6B6B,#FF8E53)'}">${p.inisial||'?'}</div>
+      <div><div class="peng-by">${p.dari||''}</div><div class="peng-date">${p.waktu||''}</div></div>
+      <span class="badge b-${p.kat==='penting'?'red':p.kat==='info'?'blue':'yellow'}" style="margin-left:auto">${p.kat||'Info'}</span>
+    </div>
+    <div class="peng-title">${p.judul||''}</div>
+    <div class="peng-body">${(p.isi||'').substring(0,100)}${(p.isi||'').length>100?'...':''}</div>
+  </div>`;
+}
+function renderDashTugasPreview(){
+  const el=document.getElementById('dash-tugas-preview');if(!el)return;
+  const aktif=(tugasData||[]).filter(t=>!t.done).slice(0,2);
+  if(aktif.length===0){
+    el.innerHTML='<div style="background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.15);border-radius:16px;padding:20px;text-align:center;color:rgba(255,255,255,.35);font-size:13px"><div style="font-size:28px;margin-bottom:8px">📚</div>Tidak ada tugas aktif</div>';
+    return;
+  }
+  el.innerHTML=aktif.map(t=>`<div class="tugas-item" onclick="goTo('tugas')">
+    <div class="tcheck${t.done?' done':''}" onclick="toggleTugas(${t.id});event.stopPropagation()"><i class="ti ti-check"></i></div>
+    <div class="tugas-body"><div class="tname">${t.nama}</div><div class="tmeta">${t.mapel}</div></div>
+    <span class="badge b-${t.prioritas==='high'?'red':t.prioritas==='low'?'green':'yellow'}">${t.deadline||'TBD'}</span>
+  </div>`).join('');
+}
+function updateDashStats(){
+  const elS=document.getElementById('stat-total-siswa');
+  const elH=document.getElementById('stat-hadir');
+  if(elS)elS.textContent=dataSiswa.length||0;
+  const hc=Object.values(absensiHariIni).filter(v=>v==='H').length;
+  if(elH)elH.textContent=hc||dataSiswa.length;
+}
 
 // ════════════════════════════════════════════════════
 //  ROLE & LOGIN BRIDGE (non-module, called from HTML)
