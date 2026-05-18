@@ -384,7 +384,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .blob1{width:280px;height:280px;background:#FF6B6B;top:-80px;right:-60px}
 .blob2{width:220px;height:220px;background:#4ECDC4;bottom:100px;left:-80px}
 .blob3{width:180px;height:180px;background:#a855f7;top:40%;right:-50px}
-#scroll-area{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;position:relative;z-index:1;padding-bottom:calc(var(--navh) + var(--safe) + 16px)}
+#scroll-area{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;position:relative;z-index:1;padding-bottom:calc(var(--navh) + var(--safe) + 20px)}
 #scroll-area::-webkit-scrollbar{display:none}
 .panel{display:none;padding:16px 14px 8px;animation:fadeUp .3s ease}
 .panel.active{display:block}
@@ -394,7 +394,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .page-header p{font-size:12px;color:var(--text2);margin-top:4px;font-weight:600}
 
 /* Dashboard */
-.dash-hero{background:linear-gradient(135deg,#FF6B6B 0%,#FF8E53 50%,#ff6348 100%);border-radius:22px;padding:18px 18px 16px;margin-bottom:14px;position:relative;overflow:hidden}
+.dash-hero{background:linear-gradient(135deg,#FF6B6B 0%,#FF8E53 50%,#ff6348 100%);border-radius:22px;padding:16px;margin-bottom:14px;position:relative;overflow:hidden;flex-shrink:0}
 .dash-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:140px;height:140px;background:rgba(255,255,255,0.12);border-radius:50%}
 .dash-hero::after{content:'';position:absolute;bottom:-30px;right:40px;width:80px;height:80px;background:rgba(255,255,255,0.08);border-radius:50%}
 .dash-hero .top{display:flex;align-items:center;gap:10px;margin-bottom:14px;position:relative;z-index:1}
@@ -406,7 +406,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .class-pill .pill-logo{width:40px;height:40px;border-radius:10px;object-fit:cover;margin-bottom:2px}
 /* hero-text: takes remaining space, truncates gracefully */
 .hero-text{flex:1;min-width:0;overflow:hidden}
-.hero-text h1{font-family:'Poppins',sans-serif;font-size:15px;font-weight:800;color:#fff;line-height:1.25;white-space:normal;word-break:break-word}
+.hero-text h1{font-family:'Poppins',sans-serif;font-size:16px;font-weight:800;color:#fff;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
 .hero-text p{font-size:11px;color:rgba(255,255,255,0.8);margin-top:4px;font-weight:600;white-space:normal;word-break:break-word}
 /* avt-row pushed to end */
 .avt-row{display:flex;flex-shrink:0;margin-left:auto}
@@ -416,7 +416,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .hstat{flex:1;background:rgba(255,255,255,0.15);border-radius:12px;padding:10px;text-align:center;backdrop-filter:blur(8px)}
 .hstat .hval{font-family:'Poppins',sans-serif;font-size:18px;font-weight:900;color:#fff}
 .hstat .hlbl{font-size:10px;color:rgba(255,255,255,0.8);font-weight:700}
-.quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
 .qa{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 6px;text-align:center;cursor:pointer;transition:transform .15s,background .15s}
 .qa:active{transform:scale(.94)}
 .qa .qa-icon{font-size:22px;margin-bottom:6px;display:block}
@@ -837,20 +837,16 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
           <!-- Pill kiri: logo + grade + jurusan -->
           <div class="class-pill">
             <img id="hero-logo-img" src="" style="display:none" class="pill-logo" alt="logo">
-            <div class="grade" id="kelas-grade">XI</div>
-            <div class="jur" id="kelas-jurusan">Teknologi</div>
+            <div class="grade" id="kelas-grade"></div>
+            <div class="jur" id="kelas-jurusan"></div>
           </div>
           <!-- Teks tengah -->
           <div class="hero-text">
-            <h1 id="kelas-title">KELAS 11 TEKNO 🚀</h1>
+            <h1 id="kelas-title">SINERGI</h1>
             <p id="kelas-subtitle"></p>
           </div>
           <!-- Avatar kanan -->
-          <div class="avt-row">
-            <div class="avt"/div>
-            <div class="avt"/div>
-            <div class="avt" style="font-size:9px"/div>
-          </div>
+          <div class="avt-row" id="avt-row"></div>
         </div>
         <div class="hero-stats">
           <div class="hstat"><div class="hval" id="db-total-siswa">0</div><div class="hlbl">Siswa</div></div>
@@ -872,10 +868,6 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
       <div id="dash-peng-preview"></div>
       <div class="sec-title"><i class="ti ti-clipboard-list"></i> Tugas Deadline Dekat</div>
       <div id="dash-tugas-preview"></div>
-              <span class="badge b-red">Besok</span>
-      </div>
-      
-      </div>
       <div class="watermark">Supported by <span>D.D Candra 2026</span></div>
     </div>
 
@@ -889,15 +881,15 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
       <!-- Saldo Card -->
       <div class="kas-saldo-card">
         <div class="saldo-lbl">💳 Saldo Kas Aktif</div>
-        <div class="saldo-val" id="kas-saldo-display">Rp 450.000</div>
-        <div class="saldo-sub" id="kas-period">Per Juni 2025 · Diperbarui hari ini</div>
+        <div class="saldo-val" id="kas-saldo-display">Rp 0</div>
+        <div class="saldo-sub" id="kas-period"> </div>
         <div class="saldo-row">
           <div class="saldo-box">
-            <div class="sb-val" id="kas-total-debet">Rp 680K</div>
+            <div class="sb-val" id="kas-total-debet">Rp 0</div>
             <div class="sb-lbl">📈 Total Pemasukan</div>
           </div>
           <div class="saldo-box">
-            <div class="sb-val" id="kas-total-kredit">Rp 230K</div>
+            <div class="sb-val" id="kas-total-kredit">Rp 0</div>
             <div class="sb-lbl">📉 Total Pengeluaran</div>
           </div>
         </div>
@@ -1344,7 +1336,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
       <div id="pengumuman-list"></div>
       <div class="watermark">Supported by <span>D.D Candra 2026</span></div>
     </div>
-  </div>
+  
 
 
   <!-- ══════ ROLE BADGE (top of app) ══════ -->
