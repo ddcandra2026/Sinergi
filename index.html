@@ -360,9 +360,26 @@ window.saveRoleKeys = async function() {
   --radius:18px;--radius-sm:12px;--radius-xs:8px;
   --navh:68px;--safe:env(safe-area-inset-bottom,0px)
 }
-html,body{height:100%;overflow:hidden;background:var(--bg)}
+html,body{
+  margin:0;padding:0;
+  width:100%;height:100%;
+  min-height:100vh;
+  min-height:-webkit-fill-available;
+  overflow:hidden;
+  background:var(--bg);
+  font-family:'Nunito',sans-serif
+}
 body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
-#app{width:100%;height:100%;display:flex;flex-direction:column;position:relative;overflow:hidden}
+#app{
+  position:relative;
+  width:100%;
+  height:100vh;
+  height:100dvh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  background:var(--bg)
+}
 .blob{position:absolute;border-radius:50%;filter:blur(60px);opacity:.25;pointer-events:none;z-index:0}
 .blob1{width:280px;height:280px;background:#FF6B6B;top:-80px;right:-60px}
 .blob2{width:220px;height:220px;background:#4ECDC4;bottom:100px;left:-80px}
@@ -544,7 +561,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .topic-meta{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
 .ttime{font-size:10px;color:var(--text3)}
 .unread-dot{background:var(--primary);color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center}
-.chat-room{display:none;position:fixed;inset:0;background:var(--bg);z-index:100;flex-direction:column}
+.chat-room{display:none;position:fixed;inset:0;background:var(--bg);z-index:500;flex-direction:column}
 .chat-room.open{display:flex}
 .chat-topbar{display:flex;align-items:center;gap:10px;padding:14px 14px 10px;background:var(--bg2);border-bottom:1px solid var(--border)}
 .chat-back{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer;border:none}
@@ -622,7 +639,19 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .peng-body{font-size:12px;color:var(--text2);line-height:1.65}
 
 /* ═══ BOTTOM NAV ═══ */
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:var(--navh);background:rgba(15,12,41,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;align-items:center;padding-bottom:var(--safe);z-index:50}
+.bottom-nav{
+  position:fixed;
+  bottom:0;left:0;right:0;
+  height:var(--navh);
+  background:rgba(15,12,41,.95);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+  display:flex;align-items:center;
+  padding-bottom:var(--safe);
+  z-index:50;
+  width:100%
+}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:8px 4px;transition:all .2s;position:relative}
 .nav-item i{font-size:22px;color:var(--text3);transition:all .2s}
 .nav-item .nav-lbl{font-size:9px;font-weight:800;color:var(--text3);transition:all .2s;letter-spacing:.3px}
@@ -636,7 +665,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .watermark span{color:rgba(255,107,107,.6)}
 
 /* ═══ OVERLAY / SHEET ═══ */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:none;align-items:flex-end}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:450;display:none;align-items:flex-end}
 .overlay.open{display:flex;animation:fadeIn .2s ease}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .bottom-sheet{background:var(--bg2);border-radius:24px 24px 0 0;padding:20px;width:100%;border-top:1px solid var(--border);animation:slideUp .3s ease;max-height:92vh;overflow-y:auto}
@@ -681,59 +710,71 @@ select.input-field option{background:#1a1740;color:#fff}
 .icon-edit-item .ie-left{display:flex;align-items:center;gap:10px}
 .icon-edit-item .ie-icon{font-size:22px;width:40px;height:40px;border-radius:12px;background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid var(--border)}
 .icon-edit-item .ie-name{font-size:13px;font-weight:700;color:var(--text)}
-/* ── Mobile-first: full screen on phone, phone frame on big desktop ── */
-
-/* Tablets & small desktop (480px-899px): just center with max-width, no frame */
-@media(min-width:480px) and (max-width:899px){
-  #app{max-width:480px;margin:0 auto}
-  .bottom-nav{max-width:480px;left:50%;transform:translateX(-50%)}
-  .chat-room{max-width:480px;left:50%;transform:translateX(-50%)}
-  .overlay .bottom-sheet,.cfg-overlay .cfg-shell{max-width:480px;margin:0 auto}
-  .kal-detail-overlay .kal-detail-box,.pres-si-overlay .pres-si-box{max-width:480px}
-  #overlay-role-panel > div{max-width:480px;margin:0 auto}
-  #role-badge-global{right:calc(50% - 232px)}
-}
-
-/* Big desktop (900px+): phone frame centered */
+/* ── Desktop only (900px+): phone frame centered ── */
 @media(min-width:900px){
+  /* ── Dark background ── */
   body{
-    background:linear-gradient(135deg,#0a0820 0%,#0f0c29 100%);
-    display:flex;align-items:center;justify-content:center;
-    min-height:100vh;overflow:auto
+    background:radial-gradient(ellipse at 30% 60%, #120824 0%, #080618 50%, #020208 100%) !important;
+    overflow:hidden !important;
+    width:100vw;height:100vh
   }
+  /* ── Phone frame: perfectly centered ── */
   #app{
-    max-width:390px;width:390px;height:844px;max-height:96vh;
-    margin:0 auto;border-radius:40px;overflow:hidden;
-    box-shadow:0 0 0 1px rgba(255,255,255,.12),
-               0 30px 80px rgba(0,0,0,.8),
-               0 0 120px rgba(255,107,107,.08);
-    position:relative
+    position:fixed !important;
+    top:50% !important;left:50% !important;
+    transform:translate(-50%,-50%) !important;
+    width:393px !important;max-width:393px !important;
+    height:min(852px,92vh) !important;
+    border-radius:44px !important;
+    overflow:hidden !important;
+    box-shadow:
+      0 0 0 2px rgba(255,255,255,.06),
+      0 0 0 14px #111122,
+      0 0 0 15px rgba(255,255,255,.05),
+      0 50px 120px rgba(0,0,0,.95),
+      0 0 160px rgba(255,107,107,.05) !important
   }
-  #app::before{
-    content:'';position:absolute;top:14px;left:50%;transform:translateX(-50%);
-    width:90px;height:5px;background:rgba(255,255,255,.15);border-radius:10px;z-index:999;pointer-events:none
-  }
-  #scroll-area{border-radius:40px}
+  /* ── Bottom nav stays inside frame ── */
   .bottom-nav{
-    max-width:390px;left:50%;transform:translateX(-50%);
-    border-radius:0 0 40px 40px
+    position:absolute !important;
+    width:100% !important;left:0 !important;
+    transform:none !important;
+    border-radius:0 0 44px 44px !important
   }
-  .chat-room{max-width:390px;left:50%;transform:translateX(-50%)}
-  .overlay .bottom-sheet,.cfg-overlay .cfg-shell{max-width:390px;margin:0 auto}
-  .kal-detail-overlay .kal-detail-box,.pres-si-overlay .pres-si-box{max-width:390px}
-  #overlay-role-panel > div{max-width:390px;margin:0 auto}
-  #role-badge-global{right:calc(50% - 182px)}
+  /* ── Scroll area inside frame ── */
+  #scroll-area{ border-radius:0 !important }
+  /* ── Chat room inside frame ── */
+  .chat-room{
+    position:absolute !important;
+    top:0 !important;left:0 !important;
+    width:100% !important;height:100% !important;
+    transform:none !important;
+    border-radius:0 !important
+  }
+  /* ── All overlays: clip to phone frame ── */
+  .overlay,.cfg-overlay,.kal-detail-overlay,.pres-si-overlay{
+    position:absolute !important;
+    border-radius:44px !important
+  }
+  /* Role badge: right of phone frame */
+  #role-badge-global{
+    position:fixed !important;
+    top:20px !important;
+    left:calc(50% + 210px) !important;
+    right:auto !important
+  }
+  /* Desktop label top */
   body::before{
     content:'KELAS 11 TEKNOLOGI';
-    position:fixed;top:20px;left:50%;transform:translateX(-50%);
+    position:fixed;top:16px;left:50%;transform:translateX(-50%);
     font-family:Poppins,sans-serif;font-size:11px;font-weight:700;
-    color:rgba(255,255,255,.12);letter-spacing:4px;text-transform:uppercase;
+    color:rgba(255,255,255,.1);letter-spacing:4px;text-transform:uppercase;
     pointer-events:none;z-index:0
   }
   body::after{
     content:'Supported by D.D Candra 2026';
-    position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
-    font-size:10px;color:rgba(255,107,107,.2);font-weight:600;
+    position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+    font-size:10px;color:rgba(255,107,107,.18);font-weight:600;
     pointer-events:none;z-index:0;letter-spacing:.5px
   }
 }
@@ -746,6 +787,24 @@ select.input-field option{background:#1a1740;color:#fff}
   body::before, body::after { display:none !important }
   #app { border-radius:0 !important; box-shadow:none !important }
 }
+
+/* ══════════════════════════════════════
+   MOBILE-FIRST GLOBAL FIXES
+   ══════════════════════════════════════ */
+
+/* Ensure #app always fills the viewport on real phones */
+@supports (height: 100dvh) {
+  #app { height: 100dvh; }
+}
+@supports not (height: 100dvh) {
+  #app { height: calc(var(--vh, 1vh) * 100); }
+}
+
+/* Prevent #app from being clipped */
+#app { min-height: 100vh; }
+
+/* All panels should be able to scroll independently */
+.panel { min-height: 100%; }
 
 /* ── Mobile touch improvements ── */
 button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
@@ -1290,16 +1349,17 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
 
   <!-- ══════ ROLE BADGE (top of app) ══════ -->
   <div id="role-badge-global" onclick="showRolePanel()"
-    style="position:fixed;top:10px;right:12px;z-index:80;
-      display:flex;align-items:center;gap:6px;
-      padding:7px 14px;border-radius:20px;
-      background:rgba(99,102,241,.35);
-      border:1px solid rgba(255,255,255,.2);
-      backdrop-filter:blur(12px);cursor:pointer;
-      transition:all .2s;
-      box-shadow:0 4px 16px rgba(0,0,0,.4);
+    style="position:fixed;top:12px;right:12px;z-index:400;
+      display:flex;align-items:center;gap:8px;
+      padding:8px 16px;border-radius:22px;
+      background:rgba(99,102,241,.5);
+      border:1px solid rgba(255,255,255,.25);
+      backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+      cursor:pointer;transition:all .2s;
+      box-shadow:0 4px 20px rgba(0,0,0,.5);
       -webkit-tap-highlight-color:transparent;
-      touch-action:manipulation">
+      touch-action:manipulation;
+      max-width:calc(100vw - 24px)">
     <span style="font-size:15px">👁️</span>
     <div>
       <div style="font-size:12px;font-weight:800;color:#fff;line-height:1" id="badge-name">Siswa</div>
@@ -1309,9 +1369,15 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
   </div>
 
   <!-- ══════ LOGIN / ROLE PANEL ══════ -->
-  <div id="overlay-role-panel" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:flex-end;justify-content:center" onclick="closeRolePanel(event)">
-    <div style="background:#1a1740;border-radius:24px 24px 0 0;padding:24px;width:100%;max-width:480px;border-top:1px solid rgba(255,255,255,.12);animation:slideUp .3s ease" onclick="event.stopPropagation()">
-      <div style="width:36px;height:4px;background:rgba(255,255,255,.2);border-radius:4px;margin:0 auto 20px"></div>
+  <div id="overlay-role-panel" style="position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)" onclick="closeRolePanel(event)">
+    <div style="background:#1a1740;border-radius:24px 24px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom));width:100%;max-width:480px;border-top:1px solid rgba(255,255,255,.12);animation:slideUp .3s ease;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="width:36px;height:4px;background:rgba(255,255,255,.2);border-radius:4px;flex:1;margin-right:12px"></div>
+        <button onclick="document.getElementById('overlay-role-panel').style.display='none'"
+          style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;
+            padding:4px 10px;color:rgba(255,255,255,.6);font-size:11px;font-weight:700;cursor:pointer;
+            font-family:Nunito,sans-serif;flex-shrink:0;touch-action:manipulation">✕ Tutup</button>
+      </div>
 
       <!-- Current role info -->
       <div id="role-panel-current" style="background:rgba(255,255,255,.06);border-radius:16px;padding:14px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
@@ -1755,7 +1821,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
 <!-- CSS Pengaturan Profesional -->
 <style>
 /* ── Pengaturan Shell ── */
-.cfg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;display:none;align-items:flex-end}
+.cfg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:450;display:none;align-items:flex-end}
 .cfg-overlay.open{display:flex;animation:fadeIn .2s ease}
 .cfg-shell{background:var(--bg2);border-radius:24px 24px 0 0;width:100%;border-top:1px solid var(--border);animation:slideUp .3s ease;max-height:93vh;display:flex;flex-direction:column;overflow:hidden}
 @media(min-width:480px){.cfg-overlay .cfg-shell{max-width:390px;margin:0 auto}}
@@ -2033,7 +2099,10 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
             <i class="ti ti-device-mobile" style="font-size:14px"></i> Penyimpanan Lokal (aktif)
           </div>
           <div id="ls-stats" style="font-size:11px;color:var(--text3);line-height:1.8">Mengambil info...</div>
-          <button onclick="refreshLsStats()" style="margin-top:8px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#128260; Refresh Info</button>
+          <div style="display:flex;gap:8px;margin-top:8px">
+  <button onclick="refreshLsStats()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#128260; Refresh</button>
+  <button onclick="resetAppConfig()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:#f87171;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#128260; Reset Tema</button>
+</div>
         </div>
 
       </div>
@@ -3807,10 +3876,24 @@ let appConfig={
   title:'KELAS', subtitle:'',
   watermark:'D.D Candra 2026',
   primary:'#FF6B6B', grad:'linear-gradient(135deg,#FF6B6B,#FF8E53)',
-  bg:'#0f0c29', bg2:'#1a1740', bg3:'#231f5a',
+  bg:'#0f0c29', bg2:'#1a1740', bg3:'#231f5a',  // DARK PURPLE DEFAULT — DO NOT CHANGE
   icons:{kas:'💰',chat:'💬',jadwal:'📅',tugas:'📚',presensi:'✅',nilai:'⭐',pengumuman:'📢',profil:'👤'}
 };
-try{const saved=localStorage.getItem('kelas11config');if(saved)appConfig=Object.assign(appConfig,JSON.parse(saved));}catch(e){}
+try{
+  const saved=localStorage.getItem('kelas11config');
+  if(saved){
+    const parsed=JSON.parse(saved);
+    // Only restore safe fields, not broken theme data
+    const safeFields=['namaKelas','namaSekolah','tahunAjaran','walikelas','walikelasNip',
+                       'namaApp','grade','jurusan','title','subtitle','watermark','icons'];
+    safeFields.forEach(k=>{ if(parsed[k]!==undefined) appConfig[k]=parsed[k]; });
+    // Restore theme only if it's a valid hex color
+    if(parsed.primary && /^#[0-9a-fA-F]{6}$/.test(parsed.primary)) appConfig.primary=parsed.primary;
+    if(parsed.bg && /^#[0-9a-fA-F]{6}$/.test(parsed.bg)) appConfig.bg=parsed.bg;
+    if(parsed.bg2 && /^#[0-9a-fA-F]{6}$/.test(parsed.bg2)) appConfig.bg2=parsed.bg2;
+    if(parsed.bg3 && /^#[0-9a-fA-F]{6}$/.test(parsed.bg3)) appConfig.bg3=parsed.bg3;
+  }
+}catch(e){ localStorage.removeItem('kelas11config'); }
 
 function saveConfig(){
   try{localStorage.setItem('kelas11config',JSON.stringify(appConfig));}catch(e){}
@@ -3855,11 +3938,22 @@ function applyConfig(){
   });
   // Active nav item color
   document.documentElement.style.setProperty('--primary',appConfig.primary);
-  // BG
-  document.documentElement.style.setProperty('--bg',appConfig.bg);
-  document.documentElement.style.setProperty('--bg2',appConfig.bg2||appConfig.bg);
-  document.documentElement.style.setProperty('--bg3',appConfig.bg3||appConfig.bg);
-  document.body.style.background=appConfig.bg;
+  // BG — only apply if valid hex, prevent blue/wrong theme
+  const validHex = v => v && /^#[0-9a-fA-F]{6}$/.test(v);
+  const defaultBg  = '#0f0c29';
+  const defaultBg2 = '#1a1740';
+  const defaultBg3 = '#231f5a';
+  const safeBg  = validHex(appConfig.bg)  ? appConfig.bg  : defaultBg;
+  const safeBg2 = validHex(appConfig.bg2) ? appConfig.bg2 : defaultBg2;
+  const safeBg3 = validHex(appConfig.bg3) ? appConfig.bg3 : defaultBg3;
+  document.documentElement.style.setProperty('--bg',  safeBg);
+  document.documentElement.style.setProperty('--bg2', safeBg2);
+  document.documentElement.style.setProperty('--bg3', safeBg3);
+  // Only set body background on mobile (desktop uses radial-gradient)
+  if(window.innerWidth < 900) document.body.style.background = safeBg;
+  // Also fix #app bg
+  const appEl = document.getElementById('app');
+  if(appEl) appEl.style.background = safeBg;
   // Page title
   document.title=appConfig.title||'KELAS 11 TEKNOLOGI 🚀';
 }
@@ -4202,8 +4296,11 @@ function showRolePanel() {
   }, 400);
 }
 function closeRolePanel(e) {
-  if (e.target.id === 'overlay-role-panel')
+  if (e.target.id === 'overlay-role-panel') {
     document.getElementById('overlay-role-panel').style.display = 'none';
+    // Blur any focused input to hide keyboard on mobile
+    if(document.activeElement) document.activeElement.blur();
+  }
 }
 function refreshRolePanelUI() {
   const role  = window._myRole  || 'viewer';
@@ -4314,6 +4411,15 @@ function dbPush(s){ if(window.dbPush) window.dbPush(s); else showToast('⏳ Fire
 function dbPull(s){ if(window.dbPull) window.dbPull(s); else showToast('⏳ Firebase sedang dimuat...'); }
 function dbSyncAll(){ if(window.dbSyncAll) window.dbSyncAll(); else showToast('⏳ Firebase sedang dimuat...'); }
 function dbDisconnect(){ if(window.dbDisconnect) window.dbDisconnect(); }
+
+// Reset seluruh konfigurasi ke default
+function resetAppConfig(){
+  if(!confirm('Reset semua pengaturan tampilan ke default? Data siswa/kas tidak berubah.')) return;
+  localStorage.removeItem('kelas11config');
+  localStorage.removeItem('kelas11icons');
+  showToast('🔄 Konfigurasi direset! Memuat ulang...');
+  setTimeout(()=>location.reload(), 1500);
+}
 function saveRoleKeys(){ if(window.saveRoleKeys) window.saveRoleKeys(); }
 
 // ── Auto-sync toggle ──
@@ -4376,6 +4482,45 @@ function refreshLsStats(){
     if(window.updateRoleBadge) window.updateRoleBadge();
     if(window.applyRoleUI) window.applyRoleUI();
   }, 600);
+
+  // Fix iOS Safari 100vh bug
+  function setVhVar(){
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', vh+'px');
+    // Also force #app to correct height
+    const app = document.getElementById('app');
+    if(app && window.innerWidth < 900){
+      app.style.height = window.innerHeight + 'px';
+    }
+  }
+  setVhVar();
+  window.addEventListener('resize', setVhVar);
+  window.addEventListener('orientationchange', ()=>setTimeout(setVhVar, 200));
+
+  // On desktop: CSS handles positioning, JS should not interfere
+  if(window.innerWidth >= 900){
+    const app = document.getElementById('app');
+    if(app){
+      app.style.height='';
+      // Make overlays position relative to #app on desktop
+      app.style.isolation = 'isolate';
+    }
+    // Move overlays inside #app for proper containment
+    const overlayIds = ['overlay-role-panel','overlay-rules-info'];
+    overlayIds.forEach(id=>{
+      const el = document.getElementById(id);
+      if(el && el.parentNode !== app) app.appendChild(el);
+    });
+    // Fix role badge position on resize
+    const badge = document.getElementById('role-badge-global');
+    if(badge){
+      badge.style.position = 'fixed';
+      badge.style.top = '20px';
+      const rect = app.getBoundingClientRect();
+      badge.style.left = (rect.right + 12) + 'px';
+      badge.style.right = 'auto';
+    }
+  }
 
   // Fallback: if firebase already connected but step3 still hidden
   setTimeout(()=>{
