@@ -4826,9 +4826,22 @@ function _initAudio() {
     if (_audioCtx.state === 'suspended') _audioCtx.resume();
   } catch(e) {}
 }
-// Attach ke interaksi pertama
-['touchstart','mousedown','keydown'].forEach(ev => {
-  document.addEventListener(ev, _initAudio, { once: false, passive: true });
+// Attach ke interaksi - agresif untuk mobile
+function _unlockAudio() {
+  _initAudio();
+  if (_audioCtx && _audioCtx.state === 'suspended') {
+    _audioCtx.resume().then(() => {
+      // Test silent buffer - wajib untuk iOS unlock
+      const buf = _audioCtx.createBuffer(1, 1, 22050);
+      const src = _audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(_audioCtx.destination);
+      src.start(0);
+    }).catch(()=>{});
+  }
+}
+['touchstart','touchend','mousedown','keydown','click'].forEach(ev => {
+  document.addEventListener(ev, _unlockAudio, { passive: true });
 });
 
 function playNotifSound() {
