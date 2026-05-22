@@ -1354,25 +1354,25 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
   
 
 
-  <!-- ══════ ROLE BADGE (top of app) ══════ -->
-  <div id="role-badge-global" onclick="showRolePanel()"
+  <!-- ══════ ROLE BADGE (auto-hide, collapsed by default) ══════ -->
+  <div id="role-badge-global" onclick="toggleRoleBadge(event)"
     style="position:fixed;top:12px;right:12px;z-index:400;
       display:flex;align-items:center;gap:8px;
-      padding:8px 16px;border-radius:22px;
+      padding:8px;border-radius:22px;
       background:rgba(99,102,241,.5);
       border:1px solid rgba(255,255,255,.25);
       backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-      cursor:pointer;transition:all .2s;
+      cursor:pointer;transition:all .3s cubic-bezier(.4,0,.2,1);
       box-shadow:0 4px 20px rgba(0,0,0,.5);
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
-      max-width:calc(100vw - 24px)">
-    <span style="font-size:15px">👁️</span>
-    <div>
+      overflow:hidden;max-width:36px">
+    <span style="font-size:15px;flex-shrink:0">👁️</span>
+    <div id="badge-text-wrap" style="opacity:0;width:0;overflow:hidden;transition:all .3s cubic-bezier(.4,0,.2,1);white-space:nowrap">
       <div style="font-size:12px;font-weight:800;color:#fff;line-height:1" id="badge-name">Siswa</div>
       <div style="font-size:10px;color:rgba(255,255,255,.6);line-height:1;margin-top:2px" id="badge-role">Ketuk untuk login</div>
     </div>
-    <span style="font-size:14px;color:rgba(255,255,255,.5);margin-left:2px">›</span>
+    <span id="badge-arrow" style="font-size:14px;color:rgba(255,255,255,.5);opacity:0;width:0;overflow:hidden;transition:all .3s">›</span>
   </div>
 
   <!-- ══════ LOGIN / ROLE PANEL ══════ -->
@@ -4355,6 +4355,44 @@ function updateDashStats(){
 // ════════════════════════════════════════════════════
 
 // ── Login / Logout ──
+// Toggle badge expand/collapse; tap expanded badge -> open panel
+let _badgeExpanded = false;
+let _badgeTimer = null;
+function toggleRoleBadge(e) {
+  const badge = document.getElementById('role-badge-global');
+  const wrap  = document.getElementById('badge-text-wrap');
+  const arrow = document.getElementById('badge-arrow');
+  if (!_badgeExpanded) {
+    // Expand
+    _badgeExpanded = true;
+    badge.style.maxWidth = '220px';
+    badge.style.padding  = '8px 16px';
+    wrap.style.opacity   = '1';
+    wrap.style.width     = 'auto';
+    arrow.style.opacity  = '1';
+    arrow.style.width    = 'auto';
+    // Auto collapse setelah 3 detik
+    clearTimeout(_badgeTimer);
+    _badgeTimer = setTimeout(() => collapseBadge(), 3000);
+  } else {
+    // Sudah expand -> buka panel
+    collapseBadge();
+    showRolePanel();
+  }
+}
+function collapseBadge() {
+  const badge = document.getElementById('role-badge-global');
+  const wrap  = document.getElementById('badge-text-wrap');
+  const arrow = document.getElementById('badge-arrow');
+  _badgeExpanded = false;
+  clearTimeout(_badgeTimer);
+  badge.style.maxWidth = '36px';
+  badge.style.padding  = '8px';
+  wrap.style.opacity   = '0';
+  wrap.style.width     = '0';
+  arrow.style.opacity  = '0';
+  arrow.style.width    = '0';
+}
 function showRolePanel() {
   const ov = document.getElementById('overlay-role-panel');
   if(ov){ ov.style.display='flex'; ov.style.zIndex='500'; }
