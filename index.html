@@ -170,30 +170,32 @@ function fbWhenReady(fn) {
   }, 500);
 }
 
-// ── Realtime listeners: topik, pengumuman, chat ──
+// ── Realtime listeners: topik, pengumuman ──
 function listenChat() {
   // Listen topik list
   onValue(ref(fbDB,'kelas11/topik'), snap=>{
-    topikData=[];
+    window._topikData = [];
     if(snap.exists()){
       snap.forEach(child=>{
-        topikData.push({id:child.key,...child.val(),unread:0,_lastPreview:'',_lastTime:null});
+        window._topikData.push({id:child.key,...child.val(),unread:0,_lastPreview:'',_lastTime:null});
       });
     }
-    if(typeof renderTopikList==='function') renderTopikList();
+    // Sync ke variabel lokal jika ada
+    if(typeof topikData !== 'undefined') { topikData.length=0; window._topikData.forEach(t=>topikData.push(t)); }
+    window.renderTopikList?.();
   });
   // Listen pengumuman
   onValue(ref(fbDB,'kelas11/pengumuman'), snap=>{
-    pengumumanData=[];
+    const arr=[];
     if(snap.exists()){
-      const arr=[];
       snap.forEach(child=>{arr.push({fbKey:child.key,...child.val()});});
-      // Urutkan terbaru di atas
-      pengumumanData=arr.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      arr.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     }
-    if(typeof renderPengumuman==='function') renderPengumuman();
-    // Update home preview
-    if(typeof renderHomePengumuman==='function') renderHomePengumuman();
+    window._pengumumanData = arr;
+    // Sync ke variabel lokal jika ada
+    if(typeof pengumumanData !== 'undefined') { pengumumanData.length=0; arr.forEach(p=>pengumumanData.push(p)); }
+    window.renderPengumuman?.();
+    window.renderHomePengumuman?.();
   });
 }
 
@@ -394,18 +396,12 @@ window.buatTopik        = buatTopik;
 window.buatPengumuman   = buatPengumuman;
 window.pinPeng          = pinPeng;
 window.hapusPeng        = hapusPeng;
-window.filterTopik      = filterTopik;
-window.renderTopikList  = renderTopikList;
-window.pickWarna        = pickWarna;
 window.openChat         = openChat;
 window.closeChat        = closeChat;
 window.showChatMenu     = showChatMenu;
 window.showTopikMenu    = showTopikMenu;
 window.hapusTopik       = hapusTopik;
 window.sendMsg          = sendMsg;
-window.filterPengumuman = filterPengumuman;
-window.filterPengumumanSheet = filterPengumumanSheet;
-window.renderPengumuman = renderPengumuman;
 </script>
 
 <style>
@@ -3832,6 +3828,9 @@ function filterPengumumanSheet(kat){
 function renderPengumuman(){
   const el=document.getElementById('pengumuman-list');
   if(!el)return;
+  // Gunakan data dari Firebase jika array lokal kosong
+  const src = (pengumumanData&&pengumumanData.length>0) ? pengumumanData : (window._pengumumanData||[]);
+  if(src!==pengumumanData) { pengumumanData.length=0; src.forEach(p=>pengumumanData.push(p)); }
   let list=pengFilter==='semua'?pengumumanData:pengumumanData.filter(p=>p.kat===pengFilter);
   // Pinned first
   list=[...list].sort((a,b)=>b.pin-a.pin);
@@ -3914,6 +3913,9 @@ function filterTopik(keyword){
 function renderTopikList(keyword=''){
   const el=document.getElementById('topik-list');
   if(!el)return;
+  // Gunakan data dari Firebase jika array lokal kosong
+  const src = (topikData&&topikData.length>0) ? topikData : (window._topikData||[]);
+  if(src!==topikData) { topikData.length=0; src.forEach(t=>topikData.push(t)); }
   const list=keyword?topikData.filter(t=>t.nama.toLowerCase().includes(keyword.toLowerCase())):topikData;
   el.innerHTML=list.map(t=>{
     const prevText=t._lastPreview||'Belum ada pesan';
@@ -4794,5 +4796,21 @@ function refreshLsStats(){
     }
   }, 3000);
 })();
+
+// ── Expose non-module render functions ke window (dipanggil oleh Firebase listeners) ──
+window.renderTopikList        = renderTopikList;
+window.renderPengumuman       = renderPengumuman;
+window.filterTopik            = filterTopik;
+window.filterPengumuman       = filterPengumuman;
+window.filterPengumumanSheet  = filterPengumumanSheet;
+window.pickWarna              = pickWarna;
+window.buatTopik              = buatTopik;
+window.buatPengumuman         = buatPengumuman;
+window.pinPeng                = pinPeng;
+window.hapusPeng              = hapusPeng;
+
+// Jika Firebase sudah terhubung sebelum script ini jalan, trigger render ulang
+if(window._topikData)     { topikData.length=0; window._topikData.forEach(t=>topikData.push(t)); renderTopikList(); }
+if(window._pengumumanData){ pengumumanData.length=0; window._pengumumanData.forEach(p=>pengumumanData.push(p)); renderPengumuman(); }
 
 </script>
