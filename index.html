@@ -43,8 +43,8 @@ const fbAuth = getAuth(fbApp);
 // ════════════════════════════════════════
 // Default kode (akan di-override dari Firebase jika ada)
 window._roleKeys = {
-  walikelas: 'WK-Sinergi2026!',
-  pengurus:  'Pengurus-Sinergi2026#'
+  walikelas: 'sinergi2026',
+  pengurus:  'pengurus2026'
 };
 window._myRole  = localStorage.getItem('kelas11_role')  || 'viewer';
 window._myName  = localStorage.getItem('kelas11_name')  || 'Siswa';
@@ -397,12 +397,8 @@ window.buatTopik        = buatTopik;
 window.buatPengumuman   = buatPengumuman;
 window.pinPeng          = pinPeng;
 window.hapusPeng        = hapusPeng;
-window.openChat         = openChat;
-window.closeChat        = closeChat;
-window.showChatMenu     = showChatMenu;
-window.showTopikMenu    = showTopikMenu;
-window.hapusTopik       = hapusTopik;
-window.sendMsg          = sendMsg;
+// openChat, closeChat, showChatMenu, showTopikMenu, hapusTopik, sendMsg
+// di-expose dari non-module script di bawah
 </script>
 
 <style>
@@ -1473,6 +1469,9 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;line-height:1.6">
           Siswa biasa tidak perlu login.<br>
           Kode diberikan oleh Wali Kelas.
+          <div id="dev-login-hint" style="display:none;margin-top:8px;background:rgba(255,200,0,.1);border:1px solid rgba(255,200,0,.3);border-radius:8px;padding:6px 10px;color:#FFE66D">
+            🔑 wk: <b id="hint-wk"></b><br>pg: <b id="hint-pg"></b>
+          </div>
         </div>
       </div>
 
@@ -3975,7 +3974,11 @@ function openChat(topikId){
   // Unsubscribe listener topik sebelumnya
   if(_chatUnsubFn){_chatUnsubFn();_chatUnsubFn=null;}
   // Subscribe realtime ke Firebase path topik ini
-  _chatUnsubFn = onValue(ref(fbDB,'kelas11/chat/'+topikId), snap=>{
+  const _onValue = window._fb?.onValue;
+  const _ref     = window._fbRef;
+  const _db      = window._fbDB;
+  if(!_onValue||!_ref||!_db){showToast('❌ Firebase belum siap');return;}
+  _chatUnsubFn = _onValue(_ref(_db,'kelas11/chat/'+topikId), snap=>{
     const msgs=document.getElementById('chatMsgs');
     if(!msgs)return;
     if(!snap.exists()){
@@ -4564,6 +4567,16 @@ function closeRolePanel(e) {
   }
 }
 function refreshRolePanelUI() {
+  // Tampilkan hint kode jika ?dev ada di URL
+  const hint = document.getElementById('dev-login-hint');
+  if(hint && location.search.includes('dev')){
+    hint.style.display='block';
+    const wk = document.getElementById('hint-wk');
+    const pg = document.getElementById('hint-pg');
+    const k = window._roleKeys||{};
+    if(wk) wk.textContent = k.walikelas||'sinergi2026';
+    if(pg) pg.textContent = k.pengurus||'pengurus2026';
+  }
   const role  = window._myRole  || 'viewer';
   const name  = window._myName  || 'Siswa';
   const icons  = { viewer:'👁️', pengurus:'⚙️', walikelas:'👩‍🏫' };
@@ -4599,12 +4612,13 @@ function doLogin() {
   if (!kode) { showToast('⚠️ Masukkan kode rahasia!'); return; }
   // Ambil keys: prioritas Firebase, fallback hardcode
   const keys = window._roleKeys || {};
-  const wkKey = keys.walikelas || 'WK-Sinergi2026!';
-  const pgKey = keys.pengurus  || 'Pengurus-Sinergi2026#';
-  console.log('[LOGIN] kode:', JSON.stringify(kode), '| wk:', JSON.stringify(wkKey), '| pg:', JSON.stringify(pgKey));
+  const wkKey = (keys.walikelas || 'sinergi2026').trim();
+  const pgKey = (keys.pengurus  || 'pengurus2026').trim();
+  const inputKode = kode.trim();
+  console.log('[LOGIN] input:', JSON.stringify(inputKode), '| wk:', JSON.stringify(wkKey), '| match:', inputKode===wkKey);
   let role = null;
-  if (kode === wkKey) role = 'walikelas';
-  else if (kode === pgKey) role = 'pengurus';
+  if (inputKode === wkKey) role = 'walikelas';
+  else if (inputKode === pgKey) role = 'pengurus';
   if (!role) {
     showToast('❌ Kode salah! Cek kode dari Wali Kelas.');
     const inp = document.getElementById('login-kode');
@@ -4820,6 +4834,13 @@ window.togglePwVis            = togglePwVis;
 window.showRolePanel          = showRolePanel;
 window.closeRolePanel         = closeRolePanel;
 window.refreshRolePanelUI     = refreshRolePanelUI;
+// ── Chat functions (dari non-module) ──
+window.openChat               = openChat;
+window.closeChat              = closeChat;
+window.sendMsg                = sendMsg;
+window.showChatMenu           = showChatMenu;
+window.showTopikMenu          = showTopikMenu;
+window.hapusTopik             = hapusTopik;
 
 // Jika Firebase sudah terhubung sebelum script ini jalan, trigger render ulang
 if(window._topikData)     { topikData.length=0; window._topikData.forEach(t=>topikData.push(t)); renderTopikList(); }
