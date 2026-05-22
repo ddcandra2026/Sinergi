@@ -16,7 +16,7 @@
 <!-- Firebase SDK v12 (ESM) + Anonymous Auth + Role System -->
 <script type="module">
 import { initializeApp }          from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, push as fbPush, serverTimestamp }
+import { getDatabase, ref, set, get, remove, onValue, push as fbPush, serverTimestamp }
                                    from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
 import { getAuth, signInAnonymously, onAuthStateChanged }
                                    from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
@@ -153,14 +153,30 @@ async function autoPullAll() {
   } catch(e) { console.warn('Auto-pull error:', e.message); }
 }
 
-// ── Chat realtime listener ──
+// ── Realtime listeners: topik, pengumuman, chat ──
 function listenChat() {
-  onValue(ref(fbDB,'kelas11/chat'), snap => {
-    if (!snap.exists()) return;
-    const msgs = [];
-    snap.forEach(child => msgs.push({ id: child.key, ...child.val() }));
-    window._chatMessages = msgs;
-    if (typeof renderChatMessages === 'function') renderChatMessages();
+  // Listen topik list
+  onValue(ref(fbDB,'kelas11/topik'), snap=>{
+    topikData=[];
+    if(snap.exists()){
+      snap.forEach(child=>{
+        topikData.push({id:child.key,...child.val(),unread:0,_lastPreview:'',_lastTime:null});
+      });
+    }
+    if(typeof renderTopikList==='function') renderTopikList();
+  });
+  // Listen pengumuman
+  onValue(ref(fbDB,'kelas11/pengumuman'), snap=>{
+    pengumumanData=[];
+    if(snap.exists()){
+      const arr=[];
+      snap.forEach(child=>{arr.push({fbKey:child.key,...child.val()});});
+      // Urutkan terbaru di atas
+      pengumumanData=arr.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    }
+    if(typeof renderPengumuman==='function') renderPengumuman();
+    // Update home preview
+    if(typeof renderHomePengumuman==='function') renderHomePengumuman();
   });
 }
 
@@ -3777,7 +3793,7 @@ function renderPengumuman(){
   // Pinned first
   list=[...list].sort((a,b)=>b.pin-a.pin);
   el.innerHTML=list.map(p=>`
-    <div class="peng-item" id="peng-${p.id}">
+    <div class="peng-item" id="peng-${p.fbKey}">
       <div class="peng-top">
         <div class="peng-ava" style="background:${p.warna}">${p.inisial}</div>
         <div style="flex:1;min-width:0">
@@ -3789,39 +3805,52 @@ function renderPengumuman(){
       <div class="peng-title">${p.judul}</div>
       <div class="peng-body">${p.isi}</div>
       <div style="display:flex;gap:6px;margin-top:10px">
-        <button class="btn btn-xs btn-ghost" onclick="pinPeng(${p.id})">${p.pin?'📌 Unpin':'📌 Pin'}</button>
-        <button class="btn btn-xs btn-ghost" onclick="hapusPeng(${p.id})" style="color:#f87171">🗑 Hapus</button>
+        <button class="btn btn-xs btn-ghost" onclick="pinPeng('${p.fbKey}')">${p.pin?'📌 Unpin':'📌 Pin'}</button>
+        <button class="btn btn-xs btn-ghost" onclick="hapusPeng('${p.fbKey}')" style="color:#f87171">🗑 Hapus</button>
       </div>
     </div>
   `).join('')||`<div class="empty-state"><div class="es-icon">📭</div><div class="es-title">Belum ada pengumuman</div><div class="es-sub">Buat pengumuman baru di atas</div></div>`;
 }
 
-function buatPengumuman(){
+async function buatPengumuman(){
   const judul=document.getElementById('peng-judul-inp').value.trim();
   const dari=document.getElementById('peng-dari-inp').value.trim();
   const isi=document.getElementById('peng-isi-inp').value.trim();
   const kat=document.getElementById('peng-kat-inp').value;
   if(!judul||!isi){showToast('⚠️ Judul dan isi tidak boleh kosong!');return;}
+  if(!window._fbConnected){showToast('❌ Tidak terhubung ke server');return;}
   const inisial=(dari||'A')[0].toUpperCase();
   const warnaMap={penting:'linear-gradient(135deg,#FF6B6B,#FF8E53)',info:'linear-gradient(135deg,#3b82f6,#1d4ed8)',kegiatan:'linear-gradient(135deg,#eab308,#ca8a04)',kelas:'linear-gradient(135deg,#a855f7,#7c3aed)'};
   const now=new Date();
-  const waktu=`Hari ini, ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  pengumumanData.unshift({id:Date.now(),dari:dari||'Tidak diketahui',judul,isi,kat,waktu,inisial,warna:warnaMap[kat]||warnaMap.info,pin:false});
-  document.getElementById('peng-judul-inp').value='';
-  document.getElementById('peng-dari-inp').value='';
-  document.getElementById('peng-isi-inp').value='';
-  closeSheet2('sheet-buat-peng');
-  renderPengumuman();
-  showToast('📢 Pengumuman "'+judul.substring(0,20)+'" dikirim!');
+  const waktu=now.toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  try{
+    await fbPush(ref(fbDB,'kelas11/pengumuman'),{
+      dari:dari||'Tidak diketahui',judul,isi,kat,waktu,inisial,
+      warna:warnaMap[kat]||warnaMap.info,pin:false,createdAt:Date.now()
+    });
+    document.getElementById('peng-judul-inp').value='';
+    document.getElementById('peng-dari-inp').value='';
+    document.getElementById('peng-isi-inp').value='';
+    closeSheet2('sheet-buat-peng');
+    showToast('📢 Pengumuman "'+judul.substring(0,20)+'" dikirim!');
+  }catch(e){showToast('❌ Gagal kirim: '+e.message);}
 }
 
-function pinPeng(id){
-  const p=pengumumanData.find(x=>x.id===id);
-  if(p){p.pin=!p.pin;renderPengumuman();showToast(p.pin?'📌 Pengumuman dipinned!':'📌 Pin dilepas');}
+async function pinPeng(fbKey){
+  const p=pengumumanData.find(x=>x.fbKey===fbKey);
+  if(!p||!window._fbConnected)return;
+  try{
+    await set(ref(fbDB,'kelas11/pengumuman/'+fbKey+'/pin'),!p.pin);
+    showToast(!p.pin?'📌 Pengumuman dipinned!':'📌 Pin dilepas');
+  }catch(e){showToast('❌ Gagal: '+e.message);}
 }
-function hapusPeng(id){
-  const idx=pengumumanData.findIndex(x=>x.id===id);
-  if(idx>-1){pengumumanData.splice(idx,1);renderPengumuman();showToast('🗑 Pengumuman dihapus');}
+async function hapusPeng(fbKey){
+  if(!window._fbConnected){showToast('❌ Tidak terhubung');return;}
+  if(!confirm('Hapus pengumuman ini?'))return;
+  try{
+    await remove(ref(fbDB,'kelas11/pengumuman/'+fbKey));
+    showToast('🗑 Pengumuman dihapus');
+  }catch(e){showToast('❌ Gagal hapus: '+e.message);}
 }
 
 // ═══════════════════════════════════════════
@@ -3840,17 +3869,19 @@ function renderTopikList(keyword=''){
   if(!el)return;
   const list=keyword?topikData.filter(t=>t.nama.toLowerCase().includes(keyword.toLowerCase())):topikData;
   el.innerHTML=list.map(t=>{
-    const lastMsg=t.msgs.length?t.msgs[t.msgs.length-1]:null;
-    const prevText=lastMsg?(lastMsg.me?'Kamu: ':lastMsg.from.split(' ')[0]+': ')+lastMsg.text:'Belum ada pesan';
-    return`<div class="topic-item" onclick="openChat(${t.id})">
-      <div class="topic-icon" style="background:${t.warna}">${t.nama.split(' ')[0]}</div>
+    const prevText=t._lastPreview||'Belum ada pesan';
+    const lastTime=t._lastTime?new Date(t._lastTime).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'';
+    const isAdmin=(window._myRole==='walikelas'||window._myRole==='pengurus');
+    return`<div class="topic-item" onclick="openChat('${t.id}')">
+      <div class="topic-icon" style="background:${t.warna}">${t.nama.substring(0,2).toUpperCase()}</div>
       <div class="topic-info">
         <div class="tname">${t.nama}</div>
         <div class="tprev">${prevText.substring(0,45)}${prevText.length>45?'…':''}</div>
       </div>
       <div class="topic-meta">
-        <div class="ttime">${lastMsg?lastMsg.time:''}</div>
+        <div class="ttime">${lastTime}</div>
         ${t.unread?`<div class="unread-dot">${t.unread}</div>`:''}
+        ${isAdmin?`<div class="topic-menu-btn" onclick="event.stopPropagation();showTopikMenu('${t.id}',this)" style="margin-top:4px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.1);font-size:12px;cursor:pointer;color:var(--text2)">⋮</div>`:''}
       </div>
     </div>`;
   }).join('')||`<div class="empty-state"><div class="es-icon">🔍</div><div class="es-title">Topik tidak ditemukan</div></div>`;
@@ -3862,65 +3893,134 @@ function pickWarna(el){
   selectedWarna=el.dataset.warna;
 }
 
-function buatTopik(){
+async function buatTopik(){
   const nama=document.getElementById('topik-nama').value.trim();
   const desc=document.getElementById('topik-desc').value.trim();
   if(!nama){showToast('⚠️ Nama topik tidak boleh kosong!');return;}
-  topikData.unshift({id:Date.now(),nama,desc:desc||'Topik baru',warna:selectedWarna,unread:0,msgs:[]});
-  document.getElementById('topik-nama').value='';
-  document.getElementById('topik-desc').value='';
-  closeSheet2('sheet-topik');
-  renderTopikList();
-  showToast('✨ Topik "'+nama+'" berhasil dibuat!');
+  if(!window._fbConnected){showToast('❌ Tidak terhubung ke server');return;}
+  try{
+    await fbPush(ref(fbDB,'kelas11/topik'),{
+      nama, desc:desc||'Topik baru', warna:selectedWarna, createdAt:Date.now()
+    });
+    document.getElementById('topik-nama').value='';
+    document.getElementById('topik-desc').value='';
+    closeSheet2('sheet-topik');
+    showToast('✨ Topik "'+nama+'" berhasil dibuat!');
+  }catch(e){showToast('❌ Gagal buat topik: '+e.message);}
 }
+
+let _chatUnsubFn = null;
 
 function openChat(topikId){
   activeTopikId=topikId;
   const topik=topikData.find(t=>t.id===topikId);
   if(!topik)return;
-  // Reset unread
   topik.unread=0;
   renderTopikList();
   document.getElementById('chatTitle').textContent=topik.nama;
   document.getElementById('chatSub').textContent=topik.desc;
-  // Render messages
-  const msgs=document.getElementById('chatMsgs');
-  msgs.innerHTML=topik.msgs.map(m=>`
-    <div class="msg-wrap ${m.me?'me':'other'}">
-      ${!m.me?`<div class="msg-sender">${m.from}</div>`:''}
-      <div class="msg-bubble">${m.text}</div>
-      <div class="msg-time">${m.time}</div>
-    </div>
-  `).join('')||`<div style="text-align:center;padding:40px 20px;color:var(--text3);font-size:13px">Belum ada pesan. Mulai diskusi! 👋</div>`;
   document.getElementById('chatRoom').classList.add('open');
   document.body.style.overflow='hidden';
-  setTimeout(()=>{msgs.scrollTop=msgs.scrollHeight},50);
+  // Unsubscribe listener topik sebelumnya
+  if(_chatUnsubFn){_chatUnsubFn();_chatUnsubFn=null;}
+  // Subscribe realtime ke Firebase path topik ini
+  _chatUnsubFn = onValue(ref(fbDB,'kelas11/chat/'+topikId), snap=>{
+    const msgs=document.getElementById('chatMsgs');
+    if(!msgs)return;
+    if(!snap.exists()){
+      msgs.innerHTML=`<div style="text-align:center;padding:40px 20px;color:var(--text3);font-size:13px">Belum ada pesan. Mulai diskusi! 👋</div>`;
+      return;
+    }
+    const myUID=window._myUID;
+    const items=[];
+    snap.forEach(child=>{const v=child.val();items.push({...v,key:child.key});});
+    msgs.innerHTML=items.map(m=>{
+      const isMe=(m.uid&&m.uid===myUID)||(m.nama===window._myName&&!m.uid);
+      const time=m.waktu?new Date(m.waktu).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'-';
+      return`<div class="msg-wrap ${isMe?'me':'other'}">
+        ${!isMe?`<div class="msg-sender">${m.nama||'?'}</div>`:''}
+        <div class="msg-bubble">${m.teks||''}</div>
+        <div class="msg-time">${time}</div>
+      </div>`;
+    }).join('');
+    msgs.scrollTop=msgs.scrollHeight;
+    // Update preview di topik list
+    const last=items[items.length-1];
+    if(last&&topik){topik._lastPreview=(last.uid===myUID?'Kamu: ':((last.nama||'?').split(' ')[0]+': '))+last.teks;topik._lastTime=last.waktu;}
+    renderTopikList();
+  });
 }
 
 function closeChat(){
   document.getElementById('chatRoom').classList.remove('open');
   document.body.style.overflow='';
+  if(_chatUnsubFn){_chatUnsubFn();_chatUnsubFn=null;}
   activeTopikId=null;
 }
 
-function showChatMenu(){showToast('Fitur menu topik segera hadir! 🚀')}
+function showChatMenu(){
+  if(activeTopikId) showTopikMenu(activeTopikId, null, true);
+}
 
-function sendMsg(){
+// ── Popup menu topik ──
+let _topikMenuOpen=null;
+function showTopikMenu(topikId, btn, fromHeader=false){
+  // Tutup menu sebelumnya
+  document.querySelectorAll('.topik-ctx-menu').forEach(m=>m.remove());
+  if(_topikMenuOpen===topikId && !fromHeader){_topikMenuOpen=null;return;}
+  _topikMenuOpen=topikId;
+  const topik=topikData.find(t=>t.id===topikId);
+  if(!topik)return;
+  const menu=document.createElement('div');
+  menu.className='topik-ctx-menu';
+  menu.style.cssText='position:fixed;z-index:800;background:#1a1740;border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:8px;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,.6);';
+  menu.innerHTML=`
+    <div style="padding:6px 10px;font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px">${topik.nama}</div>
+    <div onclick="hapusTopik('${topikId}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;color:#f87171;font-size:13px;font-weight:700;transition:background .15s" onmouseover="this.style.background='rgba(248,113,113,.1)'" onmouseout="this.style.background='transparent'">
+      <span style="font-size:16px">🗑️</span> Hapus Topik
+    </div>
+  `;
+  // Posisi menu
+  if(btn){
+    const r=btn.getBoundingClientRect();
+    menu.style.top=(r.bottom+4)+'px';
+    menu.style.right=(window.innerWidth-r.right)+'px';
+  } else {
+    menu.style.top='60px'; menu.style.right='12px';
+  }
+  document.body.appendChild(menu);
+  setTimeout(()=>document.addEventListener('click',function _close(e){
+    if(!menu.contains(e.target)){menu.remove();_topikMenuOpen=null;document.removeEventListener('click',_close);}
+  }),100);
+}
+
+async function hapusTopik(topikId){
+  if(!window._fbConnected){showToast('❌ Tidak terhubung');return;}
+  if(!confirm('Hapus topik ini beserta semua pesannya?'))return;
+  document.querySelectorAll('.topik-ctx-menu').forEach(m=>m.remove());
+  try{
+    await remove(ref(fbDB,'kelas11/topik/'+topikId));
+    await remove(ref(fbDB,'kelas11/chat/'+topikId));
+    if(activeTopikId===topikId) closeChat();
+    showToast('🗑 Topik dihapus');
+  }catch(e){showToast('❌ Gagal hapus: '+e.message);}
+}
+
+async function sendMsg(){
   const inp=document.getElementById('chatInput');
   const val=inp.value.trim();
   if(!val||activeTopikId===null)return;
-  const topik=topikData.find(t=>t.id===activeTopikId);
-  if(!topik)return;
-  const now=new Date();
-  const time=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  topik.msgs.push({from:'Kamu',me:true,text:val,time});
-  const msgs=document.getElementById('chatMsgs');
-  const div=document.createElement('div');
-  div.className='msg-wrap me';
-  div.innerHTML=`<div class="msg-bubble">${val}</div><div class="msg-time">${time}</div>`;
-  msgs.appendChild(div);
+  if(!window._fbConnected){showToast('❌ Tidak terhubung ke server');return;}
   inp.value='';
-  msgs.scrollTop=msgs.scrollHeight;
+  try{
+    await fbPush(ref(fbDB,'kelas11/chat/'+activeTopikId),{
+      uid:   window._myUID,
+      nama:  window._myName||'Pengguna',
+      role:  window._myRole||'viewer',
+      teks:  val,
+      waktu: Date.now()
+    });
+  }catch(e){showToast('❌ Gagal kirim: '+e.message);inp.value=val;}
 }
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendMsg()});
 
