@@ -65,34 +65,36 @@ async function loadRoleKeys() {
   } catch(e) { /* pakai default jika gagal */ }
 }
 
-// ── Anonymous Sign-In ──
-signInAnonymously(fbAuth)
-  .then(() => console.log('Anonymous auth OK'))
-  .catch(err => console.warn('Auth error:', err.message));
-
-onAuthStateChanged(fbAuth, async user => {
-  if (!user) return;
-  window._myUID = user.uid;
-  window._fb.uid = user.uid;
-
-  // Load keys first
-  await loadRoleKeys();
-
-  // Watch connection
-  onValue(ref(fbDB, '.info/connected'), snap => {
-    const ok = snap.val() === true;
-    window._fbConnected = ok;
+// ── Koneksi DB langsung (tanpa auth) ──
+// Monitor koneksi Firebase Realtime DB secara independen dari auth
+onValue(ref(fbDB, '.info/connected'), snap => {
+  const ok = snap.val() === true;
+  window._fbConnected = ok;
+  updateStatusBar(ok);
+  if (ok && !window._dbInitDone) {
+    window._dbInitDone = true;
+    loadRoleKeys();
+    autoPullAll();
+    updateRoleBadge();
+    applyRoleUI();
+  } else if (ok) {
     updateStatusBar(ok);
-    if (ok) {
-      // Auto-pull all data on connect
-      autoPullAll();
-    }
-  });
-
-  // Update role badge everywhere
-  updateRoleBadge();
-  applyRoleUI();
+  }
 });
+
+// ── Anonymous Sign-In (opsional, untuk UID unik per device) ──
+// Jika anonymous auth dinonaktifkan di Firebase console, pakai random UID lokal
+signInAnonymously(fbAuth)
+  .then(cred => {
+    window._myUID = cred.user.uid;
+    if(window._fb) window._fb.uid = cred.user.uid;
+  })
+  .catch(() => {
+    // Fallback: buat UID lokal persistent jika anonymous auth tidak aktif
+    let uid = localStorage.getItem('kelas11_uid');
+    if (!uid) { uid = 'local_' + Math.random().toString(36).slice(2,10); localStorage.setItem('kelas11_uid', uid); }
+    window._myUID = uid;
+  });
 
 // ── Update status bar ──
 function updateStatusBar(connected) {
