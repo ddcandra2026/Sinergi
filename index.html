@@ -404,9 +404,12 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .class-pill .jur{font-size:8px;color:rgba(255,255,255,0.85);font-weight:800;letter-spacing:1.2px;text-transform:uppercase}
 /* Logo inside pill */
 .class-pill .pill-logo{width:40px;height:40px;border-radius:10px;object-fit:cover;margin-bottom:2px}
-/* hero-text: takes remaining space, truncates gracefully */
+/* hero-text: takes remaining space */
 .hero-text{flex:1;min-width:0;overflow:hidden}
-.hero-text h1{font-family:'Poppins',sans-serif;font-size:16px;font-weight:800;color:#fff;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.hero-title-row{display:flex;align-items:center;gap:8px}
+.hero-title-group{display:flex;flex-direction:column;min-width:0}
+.hero-school-logo{width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0}
+.hero-text h1{font-family:'Poppins',sans-serif;font-size:16px;font-weight:800;color:#fff;line-height:1.2;white-space:normal;word-break:break-word;margin:0}
 .hero-text p{font-size:11px;color:rgba(255,255,255,0.8);margin-top:4px;font-weight:600;white-space:normal;word-break:break-word}
 /* avt-row pushed to end */
 .avt-row{display:flex;flex-shrink:0;margin-left:auto}
@@ -842,16 +845,20 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
     <div class="panel active" id="panel-dashboard">
       <div class="dash-hero">
         <div class="top">
-          <!-- Pill kiri: logo + grade + jurusan -->
+          <!-- Pill kiri: grade + jurusan saja -->
           <div class="class-pill">
-            <img id="hero-logo-img" src="" style="display:none" class="pill-logo" alt="logo">
             <div class="grade" id="kelas-grade"></div>
             <div class="jur" id="kelas-jurusan"></div>
           </div>
-          <!-- Teks tengah -->
+          <!-- Teks tengah: logo + nama sekolah + subtitle -->
           <div class="hero-text">
-            <h1 id="kelas-title">SINERGI</h1>
-            <p id="kelas-subtitle"></p>
+            <div class="hero-title-row">
+              <img id="hero-logo-img" src="" style="display:none" class="hero-school-logo" alt="logo">
+              <div class="hero-title-group">
+                <h1 id="kelas-title">SINERGI</h1>
+                <p id="kelas-subtitle"></p>
+              </div>
+            </div>
           </div>
           <!-- Avatar kanan -->
           <div class="avt-row" id="avt-row"></div>
