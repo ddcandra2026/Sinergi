@@ -1502,20 +1502,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
     </div>
   </div>
 
-  <!-- ══════ FIREBASE RULES INFO MODAL ══════ -->
-  <div id="overlay-rules-info" style="position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;display:none;align-items:center;justify-content:center;padding:20px" onclick="document.getElementById('overlay-rules-info').style.display='none'">
-    <div style="background:#1a1740;border-radius:20px;padding:20px;max-width:440px;width:100%;border:1px solid rgba(255,255,255,.15);max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">
-      <div style="font-family:Poppins,sans-serif;font-size:16px;font-weight:800;color:#fff;margin-bottom:14px">🔥 Firebase Rules yang Harus Dipasang</div>
-      <div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:12px">Copy rules ini ke Firebase Console → Realtime Database → Rules:</div>
-      <pre id="rules-code" style="background:rgba(0,0,0,.4);border-radius:12px;padding:14px;font-size:11px;color:#a5f3fc;overflow-x:auto;white-space:pre-wrap;border:1px solid rgba(78,205,196,.2)"></pre>
-      <button onclick="copyRules()" style="width:100%;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#4ECDC4,#44BFA3);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif;margin-top:12px">
-        📋 Copy Rules
-      </button>
-      <button onclick="document.getElementById('overlay-rules-info').style.display='none'" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);font-size:13px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif;margin-top:8px">
-        Tutup
-      </button>
-    </div>
-  </div>
+  <!-- Firebase Rules modal dihapus demi keamanan -->
 
   <!-- ══════ BOTTOM NAV ══════ -->
   <nav class="bottom-nav">
@@ -2201,9 +2188,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
               <button onclick="dbSyncAll()" data-write-only style="padding:9px;border-radius:10px;border:none;background:linear-gradient(135deg,#4ECDC4,#44BFA3);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#128260; Sync Semua Data</button>
               <button onclick="dbDisconnect()" style="padding:9px;border-radius:10px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.1);color:#f87171;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#128268; Putus Koneksi</button>
             </div>
-            <button onclick="showRulesInfo()" style="width:100%;margin-top:10px;padding:9px;border-radius:10px;border:1px solid rgba(78,205,196,.3);background:rgba(78,205,196,.08);color:#5eead4;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">
-              📋 Lihat &amp; Copy Firebase Rules
-            </button>
+
           </div>
         </div>
         </div>
