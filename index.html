@@ -381,6 +381,13 @@ window.saveRoleKeys = async function() {
   } catch(e) { showToast('❌ Gagal simpan: '+e.message); }
 };
 
+// ── Expose Firebase primitives ke global ──
+window._fbPush   = fbPush;
+window._fbRef    = ref;
+window._fbSet    = set;
+window._fbRemove = remove;
+window._fbDB     = fbDB;
+
 // ── Expose fungsi module ke global (agar bisa dipanggil dari onclick HTML) ──
 window.fbWhenReady      = fbWhenReady;
 window.buatTopik        = buatTopik;
@@ -3860,7 +3867,7 @@ function buatPengumuman(){
   const now=new Date();
   const waktu=now.toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
   try{
-    await fbPush(ref(fbDB,'kelas11/pengumuman'),{
+    await window._fbPush(window._fbRef(window._fbDB,'kelas11/pengumuman'),{
       dari:dari||'Tidak diketahui',judul,isi,kat,waktu,inisial,
       warna:warnaMap[kat]||warnaMap.info,pin:false,createdAt:Date.now()
     });
@@ -3878,7 +3885,7 @@ async function pinPeng(fbKey){
   if(!p)return;
   fbWhenReady(async()=>{
     try{
-      await set(ref(fbDB,'kelas11/pengumuman/'+fbKey+'/pin'),!p.pin);
+      await window._fbSet(window._fbRef(window._fbDB,'kelas11/pengumuman/'+fbKey+'/pin'),!p.pin);
       showToast(!p.pin?'📌 Pengumuman dipinned!':'📌 Pin dilepas');
     }catch(e){showToast('❌ Gagal: '+e.message);}
   });
@@ -3887,7 +3894,7 @@ function hapusPeng(fbKey){
   if(!confirm('Hapus pengumuman ini?'))return;
   fbWhenReady(async()=>{
     try{
-      await remove(ref(fbDB,'kelas11/pengumuman/'+fbKey));
+      await window._fbRemove(window._fbRef(window._fbDB,'kelas11/pengumuman/'+fbKey));
       showToast('🗑 Pengumuman dihapus');
     }catch(e){showToast('❌ Gagal hapus: '+e.message);}
   });
@@ -3939,7 +3946,7 @@ function buatTopik(){
   if(!nama){showToast('⚠️ Nama topik tidak boleh kosong!');return;}
   fbWhenReady(async ()=>{
     try{
-      await fbPush(ref(fbDB,'kelas11/topik'),{
+      await window._fbPush(window._fbRef(window._fbDB,'kelas11/topik'),{
         nama, desc:desc||'Topik baru', warna:selectedWarna, createdAt:Date.now()
       });
       document.getElementById('topik-nama').value='';
@@ -4040,8 +4047,8 @@ function hapusTopik(topikId){
   document.querySelectorAll('.topik-ctx-menu').forEach(m=>m.remove());
   fbWhenReady(async()=>{
     try{
-      await remove(ref(fbDB,'kelas11/topik/'+topikId));
-      await remove(ref(fbDB,'kelas11/chat/'+topikId));
+      await window._fbRemove(window._fbRef(window._fbDB,'kelas11/topik/'+topikId));
+      await window._fbRemove(window._fbRef(window._fbDB,'kelas11/chat/'+topikId));
       if(activeTopikId===topikId) closeChat();
       showToast('🗑 Topik dihapus');
     }catch(e){showToast('❌ Gagal hapus: '+e.message);}
@@ -4055,7 +4062,7 @@ function sendMsg(){
   inp.value='';
   fbWhenReady(async()=>{
     try{
-      await fbPush(ref(fbDB,'kelas11/chat/'+activeTopikId),{
+      await window._fbPush(window._fbRef(window._fbDB,'kelas11/chat/'+activeTopikId),{
         uid:   window._myUID,
         nama:  window._myName||'Pengguna',
         role:  window._myRole||'viewer',
