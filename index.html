@@ -43,8 +43,8 @@ const fbAuth = getAuth(fbApp);
 // ════════════════════════════════════════
 // Default kode (akan di-override dari Firebase jika ada)
 window._roleKeys = {
-  walikelas: 'WK-Sahabat2025!',
-  pengurus:  'Pengurus-11Tekno#'
+  walikelas: 'WK-Sinergi2026!',
+  pengurus:  'Pengurus-Sinergi2026#'
 };
 window._myRole  = localStorage.getItem('kelas11_role')  || 'viewer';
 window._myName  = localStorage.getItem('kelas11_name')  || 'Siswa';
@@ -71,14 +71,15 @@ onValue(ref(fbDB, '.info/connected'), snap => {
   const ok = snap.val() === true;
   window._fbConnected = ok;
   updateStatusBar(ok);
-  if (ok && !window._dbInitDone) {
-    window._dbInitDone = true;
+  if (ok) {
+    // Selalu reload keys setiap connected (handle reconnect)
     loadRoleKeys();
-    autoPullAll();
-    updateRoleBadge();
-    applyRoleUI();
-  } else if (ok) {
-    updateStatusBar(ok);
+    if (!window._dbInitDone) {
+      window._dbInitDone = true;
+      autoPullAll();
+    }
+    if(window.updateRoleBadge) window.updateRoleBadge();
+    if(window.applyRoleUI)     window.applyRoleUI();
   }
 });
 
@@ -4597,11 +4598,12 @@ function doLogin() {
   if (!name) { showToast('⚠️ Isi nama kamu dulu!'); return; }
   if (!kode) { showToast('⚠️ Masukkan kode rahasia!'); return; }
   const keys = window._roleKeys || {};
+  console.log('[LOGIN] kode diinput:', kode, '| wk key:', keys.walikelas, '| pg key:', keys.pengurus);
   let role = null;
   if (kode === keys.walikelas) role = 'walikelas';
   else if (kode === keys.pengurus) role = 'pengurus';
   if (!role) {
-    showToast('❌ Kode salah! Hubungi Wali Kelas.');
+    showToast('❌ Kode salah! (wk: '+keys.walikelas?.slice(0,6)+'...) Hubungi Wali Kelas.');
     const inp = document.getElementById('login-kode');
     if(inp){ inp.style.border='1px solid #f87171'; setTimeout(()=>inp.style.border='1px solid rgba(255,255,255,.15)',2000); }
     return;
