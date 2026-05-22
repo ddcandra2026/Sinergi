@@ -4597,13 +4597,16 @@ function doLogin() {
   const kode = (document.getElementById('login-kode')?.value||'').trim();
   if (!name) { showToast('⚠️ Isi nama kamu dulu!'); return; }
   if (!kode) { showToast('⚠️ Masukkan kode rahasia!'); return; }
+  // Ambil keys: prioritas Firebase, fallback hardcode
   const keys = window._roleKeys || {};
-  console.log('[LOGIN] kode diinput:', kode, '| wk key:', keys.walikelas, '| pg key:', keys.pengurus);
+  const wkKey = keys.walikelas || 'WK-Sinergi2026!';
+  const pgKey = keys.pengurus  || 'Pengurus-Sinergi2026#';
+  console.log('[LOGIN] kode:', JSON.stringify(kode), '| wk:', JSON.stringify(wkKey), '| pg:', JSON.stringify(pgKey));
   let role = null;
-  if (kode === keys.walikelas) role = 'walikelas';
-  else if (kode === keys.pengurus) role = 'pengurus';
+  if (kode === wkKey) role = 'walikelas';
+  else if (kode === pgKey) role = 'pengurus';
   if (!role) {
-    showToast('❌ Kode salah! (wk: '+keys.walikelas?.slice(0,6)+'...) Hubungi Wali Kelas.');
+    showToast('❌ Kode salah! Cek kode dari Wali Kelas.');
     const inp = document.getElementById('login-kode');
     if(inp){ inp.style.border='1px solid #f87171'; setTimeout(()=>inp.style.border='1px solid rgba(255,255,255,.15)',2000); }
     return;
@@ -4810,6 +4813,13 @@ window.buatTopik              = buatTopik;
 window.buatPengumuman         = buatPengumuman;
 window.pinPeng                = pinPeng;
 window.hapusPeng              = hapusPeng;
+// ── Login functions ──
+window.doLogin                = doLogin;
+window.logoutRole             = logoutRole;
+window.togglePwVis            = togglePwVis;
+window.showRolePanel          = showRolePanel;
+window.closeRolePanel         = closeRolePanel;
+window.refreshRolePanelUI     = refreshRolePanelUI;
 
 // Jika Firebase sudah terhubung sebelum script ini jalan, trigger render ulang
 if(window._topikData)     { topikData.length=0; window._topikData.forEach(t=>topikData.push(t)); renderTopikList(); }
