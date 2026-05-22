@@ -378,6 +378,25 @@ window.saveRoleKeys = async function() {
     showToast('✅ Kode rahasia berhasil diperbarui!');
   } catch(e) { showToast('❌ Gagal simpan: '+e.message); }
 };
+
+// ── Expose fungsi module ke global (agar bisa dipanggil dari onclick HTML) ──
+window.fbWhenReady      = fbWhenReady;
+window.buatTopik        = buatTopik;
+window.buatPengumuman   = buatPengumuman;
+window.pinPeng          = pinPeng;
+window.hapusPeng        = hapusPeng;
+window.filterTopik      = filterTopik;
+window.renderTopikList  = renderTopikList;
+window.pickWarna        = pickWarna;
+window.openChat         = openChat;
+window.closeChat        = closeChat;
+window.showChatMenu     = showChatMenu;
+window.showTopikMenu    = showTopikMenu;
+window.hapusTopik       = hapusTopik;
+window.sendMsg          = sendMsg;
+window.filterPengumuman = filterPengumuman;
+window.filterPengumumanSheet = filterPengumumanSheet;
+window.renderPengumuman = renderPengumuman;
 </script>
 
 <style>
