@@ -141,16 +141,31 @@ async function autoPullAll() {
       Object.assign(absensiPerHari, ps.val().perHari);
       if (typeof initKalender === 'function') initKalender();
     }
-    // Tugas & Pengumuman
+    // Tugas
     const ts = await get(ref(fbDB,'kelas11/tugas'));
     if (ts.exists()) {
       const d = ts.val();
-      if (d?.tugas)       { daftarTugas.splice(0,daftarTugas.length,...d.tugas); if(typeof renderTugas==='function') renderTugas(); }
-      if (d?.pengumuman)  { daftarPengumuman.splice(0,daftarPengumuman.length,...d.pengumuman); if(typeof renderPengumuman==='function') renderPengumuman(); }
+      if (d?.tugas) { daftarTugas.splice(0,daftarTugas.length,...d.tugas); if(typeof renderTugas==='function') renderTugas(); }
+      // Pengumuman kini dihandle oleh listenChat() via kelas11/pengumuman — skip override di sini
     }
     // Chat — listen realtime
     listenChat();
   } catch(e) { console.warn('Auto-pull error:', e.message); }
+}
+
+// ── Helper: tunggu Firebase tersambung (max 5 detik) ──
+function fbWhenReady(fn) {
+  if (window._fbConnected) { fn(); return; }
+  showToast('⏳ Menghubungkan ke server...');
+  let tries = 0;
+  const t = setInterval(() => {
+    tries++;
+    if (window._fbConnected) { clearInterval(t); fn(); return; }
+    if (tries >= 10) {
+      clearInterval(t);
+      showToast('❌ Tidak dapat terhubung ke server. Cek koneksi internet.');
+    }
+  }, 500);
 }
 
 // ── Realtime listeners: topik, pengumuman, chat ──
@@ -3812,13 +3827,13 @@ function renderPengumuman(){
   `).join('')||`<div class="empty-state"><div class="es-icon">📭</div><div class="es-title">Belum ada pengumuman</div><div class="es-sub">Buat pengumuman baru di atas</div></div>`;
 }
 
-async function buatPengumuman(){
+function buatPengumuman(){
   const judul=document.getElementById('peng-judul-inp').value.trim();
   const dari=document.getElementById('peng-dari-inp').value.trim();
   const isi=document.getElementById('peng-isi-inp').value.trim();
   const kat=document.getElementById('peng-kat-inp').value;
   if(!judul||!isi){showToast('⚠️ Judul dan isi tidak boleh kosong!');return;}
-  if(!window._fbConnected){showToast('❌ Tidak terhubung ke server');return;}
+  fbWhenReady(async ()=>{
   const inisial=(dari||'A')[0].toUpperCase();
   const warnaMap={penting:'linear-gradient(135deg,#FF6B6B,#FF8E53)',info:'linear-gradient(135deg,#3b82f6,#1d4ed8)',kegiatan:'linear-gradient(135deg,#eab308,#ca8a04)',kelas:'linear-gradient(135deg,#a855f7,#7c3aed)'};
   const now=new Date();
@@ -3834,23 +3849,27 @@ async function buatPengumuman(){
     closeSheet2('sheet-buat-peng');
     showToast('📢 Pengumuman "'+judul.substring(0,20)+'" dikirim!');
   }catch(e){showToast('❌ Gagal kirim: '+e.message);}
+  }); // end fbWhenReady
 }
 
 async function pinPeng(fbKey){
   const p=pengumumanData.find(x=>x.fbKey===fbKey);
-  if(!p||!window._fbConnected)return;
-  try{
-    await set(ref(fbDB,'kelas11/pengumuman/'+fbKey+'/pin'),!p.pin);
-    showToast(!p.pin?'📌 Pengumuman dipinned!':'📌 Pin dilepas');
-  }catch(e){showToast('❌ Gagal: '+e.message);}
+  if(!p)return;
+  fbWhenReady(async()=>{
+    try{
+      await set(ref(fbDB,'kelas11/pengumuman/'+fbKey+'/pin'),!p.pin);
+      showToast(!p.pin?'📌 Pengumuman dipinned!':'📌 Pin dilepas');
+    }catch(e){showToast('❌ Gagal: '+e.message);}
+  });
 }
-async function hapusPeng(fbKey){
-  if(!window._fbConnected){showToast('❌ Tidak terhubung');return;}
+function hapusPeng(fbKey){
   if(!confirm('Hapus pengumuman ini?'))return;
-  try{
-    await remove(ref(fbDB,'kelas11/pengumuman/'+fbKey));
-    showToast('🗑 Pengumuman dihapus');
-  }catch(e){showToast('❌ Gagal hapus: '+e.message);}
+  fbWhenReady(async()=>{
+    try{
+      await remove(ref(fbDB,'kelas11/pengumuman/'+fbKey));
+      showToast('🗑 Pengumuman dihapus');
+    }catch(e){showToast('❌ Gagal hapus: '+e.message);}
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -3893,20 +3912,21 @@ function pickWarna(el){
   selectedWarna=el.dataset.warna;
 }
 
-async function buatTopik(){
+function buatTopik(){
   const nama=document.getElementById('topik-nama').value.trim();
   const desc=document.getElementById('topik-desc').value.trim();
   if(!nama){showToast('⚠️ Nama topik tidak boleh kosong!');return;}
-  if(!window._fbConnected){showToast('❌ Tidak terhubung ke server');return;}
-  try{
-    await fbPush(ref(fbDB,'kelas11/topik'),{
-      nama, desc:desc||'Topik baru', warna:selectedWarna, createdAt:Date.now()
-    });
-    document.getElementById('topik-nama').value='';
-    document.getElementById('topik-desc').value='';
-    closeSheet2('sheet-topik');
-    showToast('✨ Topik "'+nama+'" berhasil dibuat!');
-  }catch(e){showToast('❌ Gagal buat topik: '+e.message);}
+  fbWhenReady(async ()=>{
+    try{
+      await fbPush(ref(fbDB,'kelas11/topik'),{
+        nama, desc:desc||'Topik baru', warna:selectedWarna, createdAt:Date.now()
+      });
+      document.getElementById('topik-nama').value='';
+      document.getElementById('topik-desc').value='';
+      closeSheet2('sheet-topik');
+      showToast('✨ Topik "'+nama+'" berhasil dibuat!');
+    }catch(e){showToast('❌ Gagal buat topik: '+e.message);}
+  });
 }
 
 let _chatUnsubFn = null;
@@ -3994,33 +4014,35 @@ function showTopikMenu(topikId, btn, fromHeader=false){
   }),100);
 }
 
-async function hapusTopik(topikId){
-  if(!window._fbConnected){showToast('❌ Tidak terhubung');return;}
+function hapusTopik(topikId){
   if(!confirm('Hapus topik ini beserta semua pesannya?'))return;
   document.querySelectorAll('.topik-ctx-menu').forEach(m=>m.remove());
-  try{
-    await remove(ref(fbDB,'kelas11/topik/'+topikId));
-    await remove(ref(fbDB,'kelas11/chat/'+topikId));
-    if(activeTopikId===topikId) closeChat();
-    showToast('🗑 Topik dihapus');
-  }catch(e){showToast('❌ Gagal hapus: '+e.message);}
+  fbWhenReady(async()=>{
+    try{
+      await remove(ref(fbDB,'kelas11/topik/'+topikId));
+      await remove(ref(fbDB,'kelas11/chat/'+topikId));
+      if(activeTopikId===topikId) closeChat();
+      showToast('🗑 Topik dihapus');
+    }catch(e){showToast('❌ Gagal hapus: '+e.message);}
+  });
 }
 
-async function sendMsg(){
+function sendMsg(){
   const inp=document.getElementById('chatInput');
   const val=inp.value.trim();
   if(!val||activeTopikId===null)return;
-  if(!window._fbConnected){showToast('❌ Tidak terhubung ke server');return;}
   inp.value='';
-  try{
-    await fbPush(ref(fbDB,'kelas11/chat/'+activeTopikId),{
-      uid:   window._myUID,
-      nama:  window._myName||'Pengguna',
-      role:  window._myRole||'viewer',
-      teks:  val,
-      waktu: Date.now()
-    });
-  }catch(e){showToast('❌ Gagal kirim: '+e.message);inp.value=val;}
+  fbWhenReady(async()=>{
+    try{
+      await fbPush(ref(fbDB,'kelas11/chat/'+activeTopikId),{
+        uid:   window._myUID,
+        nama:  window._myName||'Pengguna',
+        role:  window._myRole||'viewer',
+        teks:  val,
+        waktu: Date.now()
+      });
+    }catch(e){showToast('❌ Gagal kirim: '+e.message);inp.value=val;}
+  });
 }
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendMsg()});
 
