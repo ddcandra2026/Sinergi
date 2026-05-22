@@ -77,6 +77,8 @@ onValue(ref(fbDB, '.info/connected'), snap => {
     if (!window._dbInitDone) {
       window._dbInitDone = true;
       autoPullAll();
+      // Init notif listeners setelah firebase ready
+      setTimeout(()=>{ if(window.initNotifListeners) window.initNotifListeners(); }, 500);
     }
     if(window.updateRoleBadge) window.updateRoleBadge();
     if(window.applyRoleUI)     window.applyRoleUI();
@@ -472,7 +474,11 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .hstat .hval{font-family:'Poppins',sans-serif;font-size:18px;font-weight:900;color:#fff}
 .hstat .hlbl{font-size:10px;color:rgba(255,255,255,0.8);font-weight:700}
 .quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
-.qa{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 6px;text-align:center;cursor:pointer;transition:transform .15s,background .15s}
+.qa{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 6px;text-align:center;cursor:pointer;transition:transform .15s,background .15s;position:relative}
+.notif-badge{position:absolute;top:6px;right:6px;min-width:18px;height:18px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;border-radius:999px;display:flex;align-items:center;justify-content:center;padding:0 5px;line-height:1;box-shadow:0 2px 6px rgba(239,68,68,.5);animation:badgePop .3s cubic-bezier(.34,1.56,.64,1);z-index:10}
+@keyframes badgePop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
+.notif-badge.pulse{animation:badgePop .3s cubic-bezier(.34,1.56,.64,1),badgePulse 2s ease-in-out 0.3s infinite}
+@keyframes badgePulse{0%,100%{box-shadow:0 2px 6px rgba(239,68,68,.5)}50%{box-shadow:0 2px 14px rgba(239,68,68,.9),0 0 0 4px rgba(239,68,68,.2)}}
 .qa:active{transform:scale(.94)}
 .qa .qa-icon{font-size:22px;margin-bottom:6px;display:block}
 .qa .qa-lbl{font-size:10px;font-weight:700;color:var(--text2)}
@@ -2483,12 +2489,12 @@ function goTo(panel){
   if(navEl)navEl.classList.add('active');
   document.getElementById('scroll-area').scrollTop=0;
   if(panel==='jadwal')initJadwal();
-  if(panel==='tugas')renderTugas();
+  if(panel==='tugas'){renderTugas();if(window.onEnterSection)window.onEnterSection('tugas');}
   if(panel==='nilai')renderNilai();
   if(panel==='kas'){renderKas();renderKasBayar();}
   if(panel==='presensi'){renderAbsenList();renderDaftarSiswa();renderRekapSiswa();}
-  if(panel==='pengumuman')renderPengumuman();
-  if(panel==='chat')renderTopikList();
+  if(panel==='pengumuman'){renderPengumuman();if(window.onEnterSection)window.onEnterSection('pengumuman');}
+  if(panel==='chat'){renderTopikList();if(window.onEnterSection)window.onEnterSection('chat');}
   closeSheet2('sheet-more');
 }
 
@@ -4815,6 +4821,145 @@ function refreshLsStats(){
     }
   }, 3000);
 })();
+
+// ══════════════════════════════════════════════
+// SISTEM NOTIFIKASI BADGE + SOUND
+// ══════════════════════════════════════════════
+window._notifCounts = { chat: 0, pengumuman: 0, tugas: 0 };
+window._notifLastSeen = JSON.parse(localStorage.getItem('notif_seen') || '{"chat":0,"pengumuman":0,"tugas":0}');
+window._notifInitDone = false;
+
+// Sound notifikasi pakai Web Audio API (tidak perlu file eksternal)
+function playNotifSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+  } catch(e) {}
+}
+
+function setMenuBadge(key, count) {
+  // Update semua elemen dengan id icon-{key} (home grid + bottom nav)
+  const targets = document.querySelectorAll(`#icon-${key}`);
+  targets.forEach(el => {
+    // Cari atau buat badge di parent .qa
+    const qa = el.closest('.qa') || el.parentElement;
+    if (!qa) return;
+    let badge = qa.querySelector('.notif-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'notif-badge pulse';
+        qa.appendChild(badge);
+      }
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.className = 'notif-badge pulse';
+    } else {
+      if (badge) badge.remove();
+    }
+  });
+  window._notifCounts[key] = count;
+}
+
+function clearMenuBadge(key) {
+  window._notifLastSeen[key] = Date.now();
+  localStorage.setItem('notif_seen', JSON.stringify(window._notifLastSeen));
+  setMenuBadge(key, 0);
+}
+
+// Panggil saat masuk ke section
+function onEnterSection(key) {
+  clearMenuBadge(key);
+}
+
+// ── Listen perubahan chat (hitung pesan baru per topik) ──
+function listenNotifChat() {
+  const _onValue = window._fb?.onValue;
+  const _ref     = window._fbRef;
+  const _db      = window._fbDB;
+  if (!_onValue || !_ref || !_db) return;
+
+  _onValue(_ref(_db, 'kelas11/chat'), snap => {
+    if (!snap.exists()) { setMenuBadge('chat', 0); return; }
+    const lastSeen = window._notifLastSeen.chat || 0;
+    let newCount = 0;
+    snap.forEach(topik => {
+      topik.forEach(msg => {
+        const v = msg.val();
+        if ((v.waktu || 0) > lastSeen && v.uid !== window._myUID) newCount++;
+      });
+    });
+    const prev = window._notifCounts.chat || 0;
+    if (window._notifInitDone && newCount > prev) playNotifSound();
+    setMenuBadge('chat', newCount);
+  });
+}
+
+// ── Listen perubahan pengumuman ──
+function listenNotifPengumuman() {
+  const _onValue = window._fb?.onValue;
+  const _ref     = window._fbRef;
+  const _db      = window._fbDB;
+  if (!_onValue || !_ref || !_db) return;
+
+  _onValue(_ref(_db, 'kelas11/pengumuman'), snap => {
+    if (!snap.exists()) { setMenuBadge('pengumuman', 0); return; }
+    const lastSeen = window._notifLastSeen.pengumuman || 0;
+    let newCount = 0;
+    snap.forEach(child => {
+      const v = child.val();
+      if ((v.createdAt || 0) > lastSeen) newCount++;
+    });
+    const prev = window._notifCounts.pengumuman || 0;
+    if (window._notifInitDone && newCount > prev) playNotifSound();
+    setMenuBadge('pengumuman', newCount);
+  });
+}
+
+// ── Listen perubahan tugas ──
+function listenNotifTugas() {
+  const _onValue = window._fb?.onValue;
+  const _ref     = window._fbRef;
+  const _db      = window._fbDB;
+  if (!_onValue || !_ref || !_db) return;
+
+  _onValue(_ref(_db, 'kelas11/tugas'), snap => {
+    if (!snap.exists()) { setMenuBadge('tugas', 0); return; }
+    const lastSeen = window._notifLastSeen.tugas || 0;
+    let newCount = 0;
+    const d = snap.val();
+    if (d?.tugas) {
+      d.tugas.forEach(t => {
+        if ((t.createdAt || t.deadline || 0) > lastSeen) newCount++;
+      });
+    }
+    const prev = window._notifCounts.tugas || 0;
+    if (window._notifInitDone && newCount > prev) playNotifSound();
+    setMenuBadge('tugas', newCount);
+  });
+}
+
+// Inisialisasi semua listener notifikasi (dipanggil setelah Firebase ready)
+function initNotifListeners() {
+  listenNotifChat();
+  listenNotifPengumuman();
+  listenNotifTugas();
+  // Tandai init selesai setelah delay singkat (hindari sound saat load awal)
+  setTimeout(() => { window._notifInitDone = true; }, 2500);
+}
+
+window.clearMenuBadge   = clearMenuBadge;
+window.onEnterSection   = onEnterSection;
+window.initNotifListeners = initNotifListeners;
+window.playNotifSound   = playNotifSound;
 
 // ── Expose non-module render functions ke window (dipanggil oleh Firebase listeners) ──
 window.renderTopikList        = renderTopikList;
