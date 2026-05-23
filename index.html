@@ -1012,7 +1012,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <div class="card">
           <div class="card-header">
             <div class="card-title"><i class="ti ti-list"></i>Riwayat Transaksi</div>
-            <button class="btn btn-primary btn-sm" onclick="showSheet('sheet-trx')">+ Tambah</button>
+            <button class="btn btn-primary btn-sm" data-write-only onclick="showSheet('sheet-trx')">+ Tambah</button>
           </div>
           <div id="list-trx-all"></div>
         </div>
@@ -1023,7 +1023,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <div class="card">
           <div class="card-header">
             <div class="card-title"><i class="ti ti-trending-up" style="color:#4ade80"></i>Pemasukan (Debet)</div>
-            <button class="btn btn-success btn-sm" onclick="showSheet('sheet-trx-debet')">+ Catat</button>
+            <button class="btn btn-success btn-sm" data-write-only onclick="showSheet('sheet-trx-debet')">+ Catat</button>
           </div>
           <div id="list-debet"></div>
         </div>
@@ -1034,7 +1034,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <div class="card">
           <div class="card-header">
             <div class="card-title"><i class="ti ti-trending-down" style="color:#f87171"></i>Pengeluaran (Kredit)</div>
-            <button class="btn btn-danger btn-sm" onclick="showSheet('sheet-trx-kredit')">+ Catat</button>
+            <button class="btn btn-danger btn-sm" data-write-only onclick="showSheet('sheet-trx-kredit')">+ Catat</button>
           </div>
           <div id="list-kredit"></div>
         </div>
@@ -1071,7 +1071,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
           <div class="card">
             <div class="card-header">
               <div class="card-title"><i class="ti ti-clock" style="color:#f87171"></i>Belum Bayar</div>
-              <button class="btn btn-warning btn-sm" onclick="kirimPengingat()">📢 Ingatkan</button>
+              <button class="btn btn-warning btn-sm" data-write-only onclick="kirimPengingat()">📢 Ingatkan</button>
             </div>
             <div id="list-belum-bayar"></div>
           </div>
@@ -1105,7 +1105,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
           <h2>📅 Jadwal Pelajaran</h2>
           <p id="jadwal-subtitle"></p>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="showSheet('sheet-tambah-jadwal')" style="flex-shrink:0;margin-top:4px">
+        <button class="btn btn-primary btn-sm" data-write-only onclick="showSheet('sheet-tambah-jadwal')" style="flex-shrink:0;margin-top:4px">
           <i class="ti ti-plus"></i> Tambah
         </button>
       </div>
@@ -1119,7 +1119,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <h2>📚 Tugas &amp; PR</h2>
         <p>Pantau semua tugasmu</p>
       </div>
-      <button class="btn btn-primary" style="width:100%;margin-bottom:14px;padding:12px" onclick="showSheet('sheet-tugas')">
+      <button class="btn btn-primary" data-write-only style="width:100%;margin-bottom:14px;padding:12px" onclick="showSheet('sheet-tugas')">
         <i class="ti ti-plus"></i> Tambah Tugas
       </button>
       <div class="itabs">
@@ -1164,11 +1164,11 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
               <div style="font-size:13px;font-weight:800;color:#fff" id="absen-tanggal">Hari ini, 14 Jun 2025</div>
               <div style="font-size:11px;color:var(--text3);margin-top:2px">Tap tombol untuk set status kehadiran</div>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="simpanAbsensi()">💾 Simpan</button>
+            <button class="btn btn-primary btn-sm" data-write-only onclick="simpanAbsensi()">💾 Simpan</button>
           </div>
           <div style="display:flex;gap:8px;margin-bottom:10px">
-            <button class="btn btn-success btn-sm" style="flex:1;font-size:10px" onclick="setAllStatus('H')">✅ Semua Hadir</button>
-            <button class="btn btn-ghost btn-sm" style="flex:1;font-size:10px" onclick="setAllStatus('')">🔄 Reset</button>
+            <button class="btn btn-success btn-sm" data-write-only style="flex:1;font-size:10px" onclick="setAllStatus('H')">✅ Semua Hadir</button>
+            <button class="btn btn-ghost btn-sm" data-write-only style="flex:1;font-size:10px" onclick="setAllStatus('')">🔄 Reset</button>
           </div>
         </div>
         <div class="card">
@@ -1319,7 +1319,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <div class="card">
           <div class="card-header">
             <div class="card-title"><i class="ti ti-users" style="color:var(--purple)"></i>Daftar Siswa (<span id="total-siswa-count">34</span>)</div>
-            <button class="btn btn-primary btn-sm" onclick="showSheet('sheet-tambah-siswa')">+ Tambah</button>
+            <button class="btn btn-primary btn-sm" data-write-only onclick="showSheet('sheet-tambah-siswa')">+ Tambah</button>
           </div>
           <div id="daftar-siswa-list"></div>
         </div>
@@ -1346,7 +1346,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
       <div class="itabs" id="nilai-tabs">
         <div class="itab active" onclick="switchNilaiTab(this,'nt-rekap')">Rekap</div>
         <div class="itab" onclick="switchNilaiTab(this,'nt-grafik')">Grafik</div>
-        <div class="itab" onclick="switchNilaiTab(this,'nt-input')">Input Nilai</div>
+        <div class="itab" data-write-only onclick="switchNilaiTab(this,'nt-input')">Input Nilai</div>
       </div>
 
       <!-- Tab Rekap -->
@@ -1368,7 +1368,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
 
       <!-- Tab Input Nilai -->
       <div id="nt-input" style="display:none">
-        <button class="btn btn-primary" style="width:100%;padding:12px;margin-bottom:14px" onclick="showSheet('sheet-input-nilai')">
+        <button class="btn btn-primary" data-write-only style="width:100%;padding:12px;margin-bottom:14px" onclick="showSheet('sheet-input-nilai')">
           <i class="ti ti-plus"></i> Tambah / Edit Nilai
         </button>
         <div class="card">
@@ -2887,7 +2887,7 @@ function renderDaftarSiswa(){
         <div style="font-size:13px;font-weight:700;color:var(--text)">${s.nama}</div>
         <div style="font-size:10px;color:var(--text3)">${s.nisn} · ${s.jk==='L'?'👦 L':'👧 P'}</div>
       </div>
-      <button class="btn btn-xs btn-ghost" onclick="hapusSiswa(${s.no})" style="color:#f87171;border-color:rgba(239,68,68,.2)">🗑</button>
+      ${window._myRole!=='viewer'?'<button class="btn btn-xs btn-ghost" onclick="hapusSiswa('+s.no+')" style="color:#f87171;border-color:rgba(239,68,68,.2)">🗑</button>':''}
     </div>`;
   }).join('');
 }
@@ -3595,6 +3595,7 @@ function renderTugas(){
   </div>`;
 }
 function toggleTugas(id){
+  if(window._myRole==='viewer'){showToast('⚠️ Siswa tidak dapat mengubah status tugas');return;}
   const t=tugasData.find(x=>x.id===id);
   if(t)t.done=!t.done;
   renderTugas();
@@ -3651,7 +3652,7 @@ function renderNilai(){
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <span class="badge ${gradeBg}">${grade}</span>
-        <button class="btn btn-xs btn-ghost" onclick="hapusNilai(${n.id})" style="color:#f87171;font-size:10px">🗑</button>
+        ${window._myRole!=='viewer'?'<button class="btn btn-xs btn-ghost" onclick="hapusNilai('+n.id+')" style="color:#f87171;font-size:10px">🗑</button>':''}
       </div>
     </div>`;
   }).join('')||`<div class="empty-state"><div class="es-icon">⭐</div><div class="es-title">Belum ada nilai</div><div class="es-sub">Tambah nilai via tab Input Nilai</div></div>`;
@@ -3669,7 +3670,7 @@ function renderNilaiInputList(){
         <div style="font-size:13px;font-weight:700;color:#fff">${n.mapel}</div>
         <div style="font-size:11px;color:var(--text3)">${n.jenis} · ${n.ket}</div>
       </div>
-      <button class="btn btn-xs btn-ghost" onclick="hapusNilai(${n.id})" style="color:#f87171">🗑</button>
+      ${window._myRole!=='viewer'?'<button class="btn btn-xs btn-ghost" onclick="hapusNilai('+n.id+')" style="color:#f87171">🗑</button>':''}
     </div>`;
   }).join('')||`<div class="empty-state"><div class="es-icon">📝</div><div class="es-title">Belum ada nilai</div><div class="es-sub">Klik tombol di atas untuk menambahkan</div></div>`;
 }
