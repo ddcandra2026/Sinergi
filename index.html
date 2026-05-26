@@ -16,7 +16,7 @@
 <!-- Firebase SDK v12 (ESM) + Anonymous Auth + Role System -->
 <script type="module">
 import { initializeApp }          from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-import { getDatabase, ref, set, get, remove, onValue, push as fbPush, serverTimestamp }
+import { getDatabase, ref, set, get, onValue, push as fbPush, serverTimestamp }
                                    from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
 import { getAuth, signInAnonymously, onAuthStateChanged }
                                    from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
@@ -43,8 +43,8 @@ const fbAuth = getAuth(fbApp);
 // ════════════════════════════════════════
 // Default kode (akan di-override dari Firebase jika ada)
 window._roleKeys = {
-  walikelas: 'sinergi2026',
-  pengurus:  'pengurus2026'
+  walikelas: 'WK-Sahabat2025!',
+  pengurus:  'Pengurus-11Tekno#'
 };
 window._myRole  = localStorage.getItem('kelas11_role')  || 'viewer';
 window._myName  = localStorage.getItem('kelas11_name')  || 'Siswa';
@@ -65,39 +65,34 @@ async function loadRoleKeys() {
   } catch(e) { /* pakai default jika gagal */ }
 }
 
-// ── Koneksi DB langsung (tanpa auth) ──
-// Monitor koneksi Firebase Realtime DB secara independen dari auth
-onValue(ref(fbDB, '.info/connected'), snap => {
-  const ok = snap.val() === true;
-  window._fbConnected = ok;
-  updateStatusBar(ok);
-  if (ok) {
-    // Selalu reload keys setiap connected (handle reconnect)
-    loadRoleKeys();
-    if (!window._dbInitDone) {
-      window._dbInitDone = true;
-      autoPullAll();
-      // Init notif listeners setelah firebase ready
-      setTimeout(()=>{ if(window.initNotifListeners) window.initNotifListeners(); }, 500);
-    }
-    if(window.updateRoleBadge) window.updateRoleBadge();
-    if(window.applyRoleUI)     window.applyRoleUI();
-  }
-});
-
-// ── Anonymous Sign-In (opsional, untuk UID unik per device) ──
-// Jika anonymous auth dinonaktifkan di Firebase console, pakai random UID lokal
+// ── Anonymous Sign-In ──
 signInAnonymously(fbAuth)
-  .then(cred => {
-    window._myUID = cred.user.uid;
-    if(window._fb) window._fb.uid = cred.user.uid;
-  })
-  .catch(() => {
-    // Fallback: buat UID lokal persistent jika anonymous auth tidak aktif
-    let uid = localStorage.getItem('kelas11_uid');
-    if (!uid) { uid = 'local_' + Math.random().toString(36).slice(2,10); localStorage.setItem('kelas11_uid', uid); }
-    window._myUID = uid;
+  .then(() => console.log('Anonymous auth OK'))
+  .catch(err => console.warn('Auth error:', err.message));
+
+onAuthStateChanged(fbAuth, async user => {
+  if (!user) return;
+  window._myUID = user.uid;
+  window._fb.uid = user.uid;
+
+  // Load keys first
+  await loadRoleKeys();
+
+  // Watch connection
+  onValue(ref(fbDB, '.info/connected'), snap => {
+    const ok = snap.val() === true;
+    window._fbConnected = ok;
+    updateStatusBar(ok);
+    if (ok) {
+      // Auto-pull all data on connect
+      autoPullAll();
+    }
   });
+
+  // Update role badge everywhere
+  updateRoleBadge();
+  applyRoleUI();
+});
 
 // ── Update status bar ──
 function updateStatusBar(connected) {
@@ -146,59 +141,26 @@ async function autoPullAll() {
       Object.assign(absensiPerHari, ps.val().perHari);
       if (typeof initKalender === 'function') initKalender();
     }
-    // Tugas
+    // Tugas & Pengumuman
     const ts = await get(ref(fbDB,'kelas11/tugas'));
     if (ts.exists()) {
       const d = ts.val();
-      if (d?.tugas) { daftarTugas.splice(0,daftarTugas.length,...d.tugas); if(typeof renderTugas==='function') renderTugas(); }
-      // Pengumuman kini dihandle oleh listenChat() via kelas11/pengumuman — skip override di sini
+      if (d?.tugas)       { daftarTugas.splice(0,daftarTugas.length,...d.tugas); if(typeof renderTugas==='function') renderTugas(); }
+      if (d?.pengumuman)  { daftarPengumuman.splice(0,daftarPengumuman.length,...d.pengumuman); if(typeof renderPengumuman==='function') renderPengumuman(); }
     }
     // Chat — listen realtime
     listenChat();
   } catch(e) { console.warn('Auto-pull error:', e.message); }
 }
 
-// ── Helper: tunggu Firebase tersambung (max 5 detik) ──
-function fbWhenReady(fn) {
-  if (window._fbConnected) { fn(); return; }
-  showToast('⏳ Menghubungkan ke server...');
-  let tries = 0;
-  const t = setInterval(() => {
-    tries++;
-    if (window._fbConnected) { clearInterval(t); fn(); return; }
-    if (tries >= 10) {
-      clearInterval(t);
-      showToast('❌ Tidak dapat terhubung ke server. Cek koneksi internet.');
-    }
-  }, 500);
-}
-
-// ── Realtime listeners: topik, pengumuman ──
+// ── Chat realtime listener ──
 function listenChat() {
-  // Listen topik list
-  onValue(ref(fbDB,'kelas11/topik'), snap=>{
-    window._topikData = [];
-    if(snap.exists()){
-      snap.forEach(child=>{
-        window._topikData.push({id:child.key,...child.val(),unread:0,_lastPreview:'',_lastTime:null});
-      });
-    }
-    // Sync ke variabel lokal jika ada
-    if(typeof topikData !== 'undefined') { topikData.length=0; window._topikData.forEach(t=>topikData.push(t)); }
-    window.renderTopikList?.();
-  });
-  // Listen pengumuman
-  onValue(ref(fbDB,'kelas11/pengumuman'), snap=>{
-    const arr=[];
-    if(snap.exists()){
-      snap.forEach(child=>{arr.push({fbKey:child.key,...child.val()});});
-      arr.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-    }
-    window._pengumumanData = arr;
-    // Sync ke variabel lokal jika ada
-    if(typeof pengumumanData !== 'undefined') { pengumumanData.length=0; arr.forEach(p=>pengumumanData.push(p)); }
-    window.renderPengumuman?.();
-    window.renderHomePengumuman?.();
+  onValue(ref(fbDB,'kelas11/chat'), snap => {
+    if (!snap.exists()) return;
+    const msgs = [];
+    snap.forEach(child => msgs.push({ id: child.key, ...child.val() }));
+    window._chatMessages = msgs;
+    if (typeof renderChatMessages === 'function') renderChatMessages();
   });
 }
 
@@ -385,22 +347,6 @@ window.saveRoleKeys = async function() {
     showToast('✅ Kode rahasia berhasil diperbarui!');
   } catch(e) { showToast('❌ Gagal simpan: '+e.message); }
 };
-
-// ── Expose Firebase primitives ke global ──
-window._fbPush   = fbPush;
-window._fbRef    = ref;
-window._fbSet    = set;
-window._fbRemove = remove;
-window._fbDB     = fbDB;
-
-// ── Expose fungsi module ke global (agar bisa dipanggil dari onclick HTML) ──
-window.fbWhenReady      = fbWhenReady;
-window.buatTopik        = buatTopik;
-window.buatPengumuman   = buatPengumuman;
-window.pinPeng          = pinPeng;
-window.hapusPeng        = hapusPeng;
-// openChat, closeChat, showChatMenu, showTopikMenu, hapusTopik, sendMsg
-// di-expose dari non-module script di bawah
 </script>
 
 <style>
@@ -451,20 +397,38 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .dash-hero{background:linear-gradient(135deg,#FF6B6B 0%,#FF8E53 50%,#ff6348 100%);border-radius:22px;padding:16px;margin-bottom:14px;position:relative;overflow:hidden;flex-shrink:0}
 .dash-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:140px;height:140px;background:rgba(255,255,255,0.12);border-radius:50%}
 .dash-hero::after{content:'';position:absolute;bottom:-30px;right:40px;width:80px;height:80px;background:rgba(255,255,255,0.08);border-radius:50%}
-.dash-hero .top{display:flex;align-items:center;gap:10px;margin-bottom:14px;position:relative;z-index:1}
+.dash-hero .top{
+  display:flex;align-items:flex-start;gap:10px;
+  margin-bottom:12px;position:relative;z-index:1
+}
 /* class-pill: fixed width, no shrink */
-.class-pill{background:rgba(255,255,255,0.22);border-radius:14px;padding:10px 12px;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.25);flex-shrink:0;text-align:center;min-width:60px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.class-pill{
+  background:rgba(255,255,255,.22);border-radius:12px;
+  padding:8px 10px;border:1.5px solid rgba(255,255,255,.3);
+  text-align:center;flex-shrink:0;min-width:48px
+;min-width:52px}
 .class-pill .grade{font-family:'Poppins',sans-serif;font-size:18px;font-weight:900;color:#fff;line-height:1}
 .class-pill .jur{font-size:8px;color:rgba(255,255,255,0.85);font-weight:800;letter-spacing:1.2px;text-transform:uppercase}
 /* Logo inside pill */
-.class-pill .pill-logo{width:40px;height:40px;border-radius:10px;object-fit:cover;margin-bottom:2px}
-/* hero-text: takes remaining space */
+/* pill-logo removed — logo now next to title */
+/* hero-text: takes remaining space, truncates gracefully */
 .hero-text{flex:1;min-width:0;overflow:hidden}
-.hero-title-row{display:flex;align-items:center;gap:8px}
-.hero-title-group{display:flex;flex-direction:column;min-width:0}
-.hero-school-logo{width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0}
-.hero-text h1{font-family:'Poppins',sans-serif;font-size:16px;font-weight:800;color:#fff;line-height:1.2;white-space:normal;word-break:break-word;margin:0}
-.hero-text p{font-size:11px;color:rgba(255,255,255,0.8);margin-top:4px;font-weight:600;white-space:normal;word-break:break-word}
+.hero-title-row{display:flex;align-items:center;gap:8px;width:100%}
+.hero-logo{width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15)}
+.hero-title-block{flex:1;min-width:0}
+.hero-title-block h1{font-family:'Poppins',sans-serif;font-size:14px;font-weight:800;color:#fff;line-height:1.25;white-space:normal;word-break:break-word;overflow:visible;max-width:none;margin:0}
+.hero-title-block p{font-size:11px;color:rgba(255,255,255,.85);margin-top:3px;font-weight:600;white-space:normal;word-break:break-word}
+.hero-text h1{
+  font-family:'Poppins',sans-serif;
+  font-size:15px;font-weight:800;color:#fff;
+  line-height:1.2;
+  white-space:normal;
+  overflow:visible;
+  text-overflow:unset;
+  max-width:none;
+  word-break:break-word
+}
+.hero-text p{font-size:11px;color:rgba(255,255,255,.85);margin-top:3px;font-weight:600;white-space:normal;word-break:break-word}
 /* avt-row pushed to end */
 .avt-row{display:flex;flex-shrink:0;margin-left:auto}
 .avt{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.22);border:2px solid rgba(255,255,255,0.4);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;margin-left:-5px}
@@ -474,11 +438,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .hstat .hval{font-family:'Poppins',sans-serif;font-size:18px;font-weight:900;color:#fff}
 .hstat .hlbl{font-size:10px;color:rgba(255,255,255,0.8);font-weight:700}
 .quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
-.qa{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 6px;text-align:center;cursor:pointer;transition:transform .15s,background .15s;position:relative}
-.notif-badge{position:absolute;top:6px;right:6px;min-width:18px;height:18px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;border-radius:999px;display:flex;align-items:center;justify-content:center;padding:0 5px;line-height:1;box-shadow:0 2px 6px rgba(239,68,68,.5);animation:badgePop .3s cubic-bezier(.34,1.56,.64,1);z-index:10}
-@keyframes badgePop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
-.notif-badge.pulse{animation:badgePop .3s cubic-bezier(.34,1.56,.64,1),badgePulse 2s ease-in-out 0.3s infinite}
-@keyframes badgePulse{0%,100%{box-shadow:0 2px 6px rgba(239,68,68,.5)}50%{box-shadow:0 2px 14px rgba(239,68,68,.9),0 0 0 4px rgba(239,68,68,.2)}}
+.qa{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 6px;text-align:center;cursor:pointer;transition:transform .15s,background .15s}
 .qa:active{transform:scale(.94)}
 .qa .qa-icon{font-size:22px;margin-bottom:6px;display:block}
 .qa .qa-lbl{font-size:10px;font-weight:700;color:var(--text2)}
@@ -526,7 +486,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .trx-item:last-child{border-bottom:none}
 .trx-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 .trx-info{flex:1;min-width:0}
-.trx-info .tname{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trx-info .tname{font-size:13px;font-weight:700;color:var(--text);white-space:normal;word-break:break-word}
 .trx-info .tdate{font-size:11px;color:var(--text3);margin-top:2px}
 .trx-info .tkat{font-size:10px;color:var(--text3);margin-top:2px}
 .trx-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
@@ -618,7 +578,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);position:relative}
 .topic-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
 .topic-info{flex:1;min-width:0}
 .topic-info .tname{font-size:13px;font-weight:800;color:#fff}
-.topic-info .tprev{font-size:11px;color:var(--text3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topic-info .tprev{font-size:11px;color:var(--text3);margin-top:3px;white-space:normal;word-break:break-word}
 .topic-meta{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
 .ttime{font-size:10px;color:var(--text3)}
 .unread-dot{background:var(--primary);color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center}
@@ -903,22 +863,22 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
     <div class="panel active" id="panel-dashboard">
       <div class="dash-hero">
         <div class="top">
-          <!-- Pill kiri: grade + jurusan saja -->
+          <!-- Pill kiri: HANYA Grade + Jurusan, tanpa logo -->
           <div class="class-pill">
             <div class="grade" id="kelas-grade"></div>
             <div class="jur" id="kelas-jurusan"></div>
           </div>
-          <!-- Teks tengah: logo + nama sekolah + subtitle -->
+          <!-- Tengah: Logo + Title + Subtitle -->
           <div class="hero-text">
             <div class="hero-title-row">
-              <img id="hero-logo-img" src="" style="display:none" class="hero-school-logo" alt="logo">
-              <div class="hero-title-group">
+              <img id="hero-logo-img" src="" alt="logo" class="hero-logo" style="display:none">
+              <div class="hero-title-block">
                 <h1 id="kelas-title">SINERGI</h1>
                 <p id="kelas-subtitle"></p>
               </div>
             </div>
           </div>
-          <!-- Avatar kanan -->
+          <!-- Kanan: Avatar -->
           <div class="avt-row" id="avt-row"></div>
         </div>
         <div class="hero-stats">
@@ -1012,7 +972,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <div class="card">
           <div class="card-header">
             <div class="card-title"><i class="ti ti-list"></i>Riwayat Transaksi</div>
-            <button class="btn btn-primary btn-sm" data-write-only onclick="showSheet('sheet-trx')">+ Tambah</button>
+            <button class="btn btn-primary btn-sm" onclick="showSheet('sheet-trx')">+ Tambah</button>
           </div>
           <div id="list-trx-all"></div>
         </div>
@@ -1023,7 +983,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <div class="card">
           <div class="card-header">
             <div class="card-title"><i class="ti ti-trending-up" style="color:#4ade80"></i>Pemasukan (Debet)</div>
-            <button class="btn btn-success btn-sm" data-write-only onclick="showSheet('sheet-trx-debet')">+ Catat</button>
+            <button class="btn btn-success btn-sm" onclick="showSheet('sheet-trx-debet')">+ Catat</button>
           </div>
           <div id="list-debet"></div>
         </div>
@@ -1034,7 +994,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <div class="card">
           <div class="card-header">
             <div class="card-title"><i class="ti ti-trending-down" style="color:#f87171"></i>Pengeluaran (Kredit)</div>
-            <button class="btn btn-danger btn-sm" data-write-only onclick="showSheet('sheet-trx-kredit')">+ Catat</button>
+            <button class="btn btn-danger btn-sm" onclick="showSheet('sheet-trx-kredit')">+ Catat</button>
           </div>
           <div id="list-kredit"></div>
         </div>
@@ -1071,7 +1031,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
           <div class="card">
             <div class="card-header">
               <div class="card-title"><i class="ti ti-clock" style="color:#f87171"></i>Belum Bayar</div>
-              <button class="btn btn-warning btn-sm" data-write-only onclick="kirimPengingat()">📢 Ingatkan</button>
+              <button class="btn btn-warning btn-sm" onclick="kirimPengingat()">📢 Ingatkan</button>
             </div>
             <div id="list-belum-bayar"></div>
           </div>
@@ -1105,7 +1065,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
           <h2>📅 Jadwal Pelajaran</h2>
           <p id="jadwal-subtitle"></p>
         </div>
-        <button class="btn btn-primary btn-sm" data-write-only onclick="showSheet('sheet-tambah-jadwal')" style="flex-shrink:0;margin-top:4px">
+        <button class="btn btn-primary btn-sm" onclick="showSheet('sheet-tambah-jadwal')" style="flex-shrink:0;margin-top:4px">
           <i class="ti ti-plus"></i> Tambah
         </button>
       </div>
@@ -1119,7 +1079,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <h2>📚 Tugas &amp; PR</h2>
         <p>Pantau semua tugasmu</p>
       </div>
-      <button class="btn btn-primary" data-write-only style="width:100%;margin-bottom:14px;padding:12px" onclick="showSheet('sheet-tugas')">
+      <button class="btn btn-primary" style="width:100%;margin-bottom:14px;padding:12px" onclick="showSheet('sheet-tugas')">
         <i class="ti ti-plus"></i> Tambah Tugas
       </button>
       <div class="itabs">
@@ -1164,11 +1124,11 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
               <div style="font-size:13px;font-weight:800;color:#fff" id="absen-tanggal">Hari ini, 14 Jun 2025</div>
               <div style="font-size:11px;color:var(--text3);margin-top:2px">Tap tombol untuk set status kehadiran</div>
             </div>
-            <button class="btn btn-primary btn-sm" data-write-only onclick="simpanAbsensi()">💾 Simpan</button>
+            <button class="btn btn-primary btn-sm" onclick="simpanAbsensi()">💾 Simpan</button>
           </div>
           <div style="display:flex;gap:8px;margin-bottom:10px">
-            <button class="btn btn-success btn-sm" data-write-only style="flex:1;font-size:10px" onclick="setAllStatus('H')">✅ Semua Hadir</button>
-            <button class="btn btn-ghost btn-sm" data-write-only style="flex:1;font-size:10px" onclick="setAllStatus('')">🔄 Reset</button>
+            <button class="btn btn-success btn-sm" style="flex:1;font-size:10px" onclick="setAllStatus('H')">✅ Semua Hadir</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1;font-size:10px" onclick="setAllStatus('')">🔄 Reset</button>
           </div>
         </div>
         <div class="card">
@@ -1278,7 +1238,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
 
           <!-- Export Buttons -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <button data-write-only onclick="exportRekapExcel()"
+            <button onclick="exportRekapExcel()"
               style="display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#4ECDC4,#44BFA3);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif;box-shadow:0 4px 12px rgba(78,205,196,.3)">
               <i class="ti ti-file-spreadsheet" style="font-size:16px"></i> Export Excel
             </button>
@@ -1303,7 +1263,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <input type="file" id="excel-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelUpload(event)">
 
         <!-- Template Download -->
-        <div class="template-btn" data-write-only onclick="downloadTemplate()">
+        <div class="template-btn" onclick="downloadTemplate()">
           <i class="ti ti-download"></i>
           <div class="tb-text">
             <div class="tb-title">📥 Download Template Excel</div>
@@ -1319,7 +1279,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <div class="card">
           <div class="card-header">
             <div class="card-title"><i class="ti ti-users" style="color:var(--purple)"></i>Daftar Siswa (<span id="total-siswa-count">34</span>)</div>
-            <button class="btn btn-primary btn-sm" data-write-only onclick="showSheet('sheet-tambah-siswa')">+ Tambah</button>
+            <button class="btn btn-primary btn-sm" onclick="showSheet('sheet-tambah-siswa')">+ Tambah</button>
           </div>
           <div id="daftar-siswa-list"></div>
         </div>
@@ -1346,7 +1306,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
       <div class="itabs" id="nilai-tabs">
         <div class="itab active" onclick="switchNilaiTab(this,'nt-rekap')">Rekap</div>
         <div class="itab" onclick="switchNilaiTab(this,'nt-grafik')">Grafik</div>
-        <div class="itab" data-write-only onclick="switchNilaiTab(this,'nt-input')">Input Nilai</div>
+        <div class="itab" onclick="switchNilaiTab(this,'nt-input')">Input Nilai</div>
       </div>
 
       <!-- Tab Rekap -->
@@ -1368,7 +1328,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
 
       <!-- Tab Input Nilai -->
       <div id="nt-input" style="display:none">
-        <button class="btn btn-primary" data-write-only style="width:100%;padding:12px;margin-bottom:14px" onclick="showSheet('sheet-input-nilai')">
+        <button class="btn btn-primary" style="width:100%;padding:12px;margin-bottom:14px" onclick="showSheet('sheet-input-nilai')">
           <i class="ti ti-plus"></i> Tambah / Edit Nilai
         </button>
         <div class="card">
@@ -1412,25 +1372,25 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
   
 
 
-  <!-- ══════ ROLE BADGE (auto-hide, collapsed by default) ══════ -->
-  <div id="role-badge-global" onclick="toggleRoleBadge(event)"
+  <!-- ══════ ROLE BADGE (top of app) ══════ -->
+  <div id="role-badge-global" onclick="showRolePanel()"
     style="position:fixed;top:12px;right:12px;z-index:400;
       display:flex;align-items:center;gap:8px;
-      padding:8px;border-radius:22px;
+      padding:8px 16px;border-radius:22px;
       background:rgba(99,102,241,.5);
       border:1px solid rgba(255,255,255,.25);
       backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-      cursor:pointer;transition:all .3s cubic-bezier(.4,0,.2,1);
+      cursor:pointer;transition:all .2s;
       box-shadow:0 4px 20px rgba(0,0,0,.5);
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
-      overflow:hidden;max-width:36px">
-    <span style="font-size:15px;flex-shrink:0">👁️</span>
-    <div id="badge-text-wrap" style="opacity:0;width:0;overflow:hidden;transition:all .3s cubic-bezier(.4,0,.2,1);white-space:nowrap">
+      max-width:calc(100vw - 24px)">
+    <span style="font-size:15px">👁️</span>
+    <div>
       <div style="font-size:12px;font-weight:800;color:#fff;line-height:1" id="badge-name">Siswa</div>
       <div style="font-size:10px;color:rgba(255,255,255,.6);line-height:1;margin-top:2px" id="badge-role">Ketuk untuk login</div>
     </div>
-    <span id="badge-arrow" style="font-size:14px;color:rgba(255,255,255,.5);opacity:0;width:0;overflow:hidden;transition:all .3s">›</span>
+    <span style="font-size:14px;color:rgba(255,255,255,.5);margin-left:2px">›</span>
   </div>
 
   <!-- ══════ LOGIN / ROLE PANEL ══════ -->
@@ -1475,9 +1435,6 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
         <div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;line-height:1.6">
           Siswa biasa tidak perlu login.<br>
           Kode diberikan oleh Wali Kelas.
-          <div id="dev-login-hint" style="display:none;margin-top:8px;background:rgba(255,200,0,.1);border:1px solid rgba(255,200,0,.3);border-radius:8px;padding:6px 10px;color:#FFE66D">
-            🔑 wk: <b id="hint-wk"></b><br>pg: <b id="hint-pg"></b>
-          </div>
         </div>
       </div>
 
@@ -1502,7 +1459,20 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
     </div>
   </div>
 
-  <!-- Firebase Rules modal dihapus demi keamanan -->
+  <!-- ══════ FIREBASE RULES INFO MODAL ══════ -->
+  <div id="overlay-rules-info" style="position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;display:none;align-items:center;justify-content:center;padding:20px" onclick="document.getElementById('overlay-rules-info').style.display='none'">
+    <div style="background:#1a1740;border-radius:20px;padding:20px;max-width:440px;width:100%;border:1px solid rgba(255,255,255,.15);max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div style="font-family:Poppins,sans-serif;font-size:16px;font-weight:800;color:#fff;margin-bottom:14px">🔥 Firebase Rules yang Harus Dipasang</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:12px">Copy rules ini ke Firebase Console → Realtime Database → Rules:</div>
+      <pre id="rules-code" style="background:rgba(0,0,0,.4);border-radius:12px;padding:14px;font-size:11px;color:#a5f3fc;overflow-x:auto;white-space:pre-wrap;border:1px solid rgba(78,205,196,.2)"></pre>
+      <button onclick="copyRules()" style="width:100%;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#4ECDC4,#44BFA3);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif;margin-top:12px">
+        📋 Copy Rules
+      </button>
+      <button onclick="document.getElementById('overlay-rules-info').style.display='none'" style="width:100%;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);font-size:13px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif;margin-top:8px">
+        Tutup
+      </button>
+    </div>
+  </div>
 
   <!-- ══════ BOTTOM NAV ══════ -->
   <nav class="bottom-nav">
@@ -1529,7 +1499,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
   <div class="chat-topbar">
     <button class="chat-back" onclick="closeChat()"><i class="ti ti-arrow-left"></i></button>
     <div style="flex:1;min-width:0">
-      <h3 id="chatTitle" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Topik Chat</h3>
+      <h3 id="chatTitle" style="white-space:normal;word-break:break-word">Topik Chat</h3>
       <span id="chatSub">anggota aktif</span>
     </div>
     <button class="btn btn-ghost btn-sm" onclick="showChatMenu()" style="flex-shrink:0"><i class="ti ti-dots-vertical"></i></button>
@@ -1987,13 +1957,13 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
 
     <!-- Tab Bar -->
     <div class="cfg-tabbar">
-      <button class="cfg-tab-btn active" id="cfg-tab-identitas" data-write-only onclick="cfgGoTab('identitas')">
+      <button class="cfg-tab-btn active" id="cfg-tab-identitas" onclick="cfgGoTab('identitas')">
         <i class="ti ti-building-community"></i> Identitas
       </button>
-      <button class="cfg-tab-btn" id="cfg-tab-ikon" data-write-only onclick="cfgGoTab('ikon')">
+      <button class="cfg-tab-btn" id="cfg-tab-ikon" onclick="cfgGoTab('ikon')">
         <i class="ti ti-palette"></i> Ikon
       </button>
-      <button class="cfg-tab-btn" id="cfg-tab-tema" data-write-only onclick="cfgGoTab('tema')">
+      <button class="cfg-tab-btn" id="cfg-tab-tema" onclick="cfgGoTab('tema')">
         <i class="ti ti-color-swatch"></i> Tema
       </button>
       <button class="cfg-tab-btn" id="cfg-tab-database" onclick="cfgGoTab('database')">
@@ -2139,7 +2109,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
                 </div>
                 <div style="display:flex;gap:6px">
                   <button onclick="dbPush('siswa')" data-write-only style="padding:5px 10px;border-radius:8px;border:none;background:rgba(59,130,246,.2);color:#60a5fa;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#8593; Upload</button>
-                  <button data-write-only onclick="dbPull('siswa')" style="padding:5px 10px;border-radius:8px;border:none;background:rgba(34,197,94,.2);color:#4ade80;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#8595; Download</button>
+                  <button onclick="dbPull('siswa')" style="padding:5px 10px;border-radius:8px;border:none;background:rgba(34,197,94,.2);color:#4ade80;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#8595; Download</button>
                 </div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.05);border-radius:12px;padding:10px 12px;border:1px solid var(--border)">
@@ -2149,7 +2119,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
                 </div>
                 <div style="display:flex;gap:6px">
                   <button onclick="dbPush('kas')" data-write-only style="padding:5px 10px;border-radius:8px;border:none;background:rgba(59,130,246,.2);color:#60a5fa;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#8593; Upload</button>
-                  <button data-write-only onclick="dbPull('kas')" style="padding:5px 10px;border-radius:8px;border:none;background:rgba(34,197,94,.2);color:#4ade80;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#8595; Download</button>
+                  <button onclick="dbPull('kas')" style="padding:5px 10px;border-radius:8px;border:none;background:rgba(34,197,94,.2);color:#4ade80;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#8595; Download</button>
                 </div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.05);border-radius:12px;padding:10px 12px;border:1px solid var(--border)">
@@ -2159,7 +2129,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
                 </div>
                 <div style="display:flex;gap:6px">
                   <button onclick="dbPush('presensi')" data-write-only style="padding:5px 10px;border-radius:8px;border:none;background:rgba(59,130,246,.2);color:#60a5fa;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#8593; Upload</button>
-                  <button data-write-only onclick="dbPull('presensi')" style="padding:5px 10px;border-radius:8px;border:none;background:rgba(34,197,94,.2);color:#4ade80;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#8595; Download</button>
+                  <button onclick="dbPull('presensi')" style="padding:5px 10px;border-radius:8px;border:none;background:rgba(34,197,94,.2);color:#4ade80;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#8595; Download</button>
                 </div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.05);border-radius:12px;padding:10px 12px;border:1px solid var(--border)">
@@ -2169,7 +2139,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
                 </div>
                 <div style="display:flex;gap:6px">
                   <button onclick="dbPush('tugas')" data-write-only style="padding:5px 10px;border-radius:8px;border:none;background:rgba(59,130,246,.2);color:#60a5fa;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#8593; Upload</button>
-                  <button data-write-only onclick="dbPull('tugas')" style="padding:5px 10px;border-radius:8px;border:none;background:rgba(34,197,94,.2);color:#4ade80;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#8595; Download</button>
+                  <button onclick="dbPull('tugas')" style="padding:5px 10px;border-radius:8px;border:none;background:rgba(34,197,94,.2);color:#4ade80;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#8595; Download</button>
                 </div>
               </div>
             </div>
@@ -2188,7 +2158,9 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
               <button onclick="dbSyncAll()" data-write-only style="padding:9px;border-radius:10px;border:none;background:linear-gradient(135deg,#4ECDC4,#44BFA3);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#128260; Sync Semua Data</button>
               <button onclick="dbDisconnect()" style="padding:9px;border-radius:10px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.1);color:#f87171;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#128268; Putus Koneksi</button>
             </div>
-
+            <button onclick="showRulesInfo()" style="width:100%;margin-top:10px;padding:9px;border-radius:10px;border:1px solid rgba(78,205,196,.3);background:rgba(78,205,196,.08);color:#5eead4;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">
+              📋 Lihat &amp; Copy Firebase Rules
+            </button>
           </div>
         </div>
         </div>
@@ -2201,7 +2173,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
           <div id="ls-stats" style="font-size:11px;color:var(--text3);line-height:1.8">Mengambil info...</div>
           <div style="display:flex;gap:8px;margin-top:8px">
   <button onclick="refreshLsStats()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#128260; Refresh</button>
-  <button data-write-only onclick="resetAppConfig()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:#f87171;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#128260; Reset Tema</button>
+  <button onclick="resetAppConfig()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:#f87171;font-size:11px;font-weight:700;cursor:pointer;font-family:Nunito,sans-serif">&#128260; Reset Tema</button>
 </div>
         </div>
 
@@ -2365,7 +2337,7 @@ button, .qa, .nav-item, .nav-center-btn, .itab, .tpi,
 .psi-file-preview{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin-top:10px}
 .psi-file-preview .pf-icon{font-size:24px;flex-shrink:0}
 .psi-file-preview .pf-info{flex:1;min-width:0}
-.psi-file-preview .pf-name{font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.psi-file-preview .pf-name{font-size:12px;font-weight:700;color:#fff;white-space:normal;word-break:break-word}
 .psi-file-preview .pf-size{font-size:10px;color:var(--text3);margin-top:2px}
 .psi-file-preview .pf-ok{color:#4ade80;font-size:20px;flex-shrink:0}
 .psi-save-btn{width:100%;padding:14px;border-radius:16px;font-size:14px;font-weight:800;font-family:'Nunito',sans-serif;border:none;cursor:pointer;margin-top:18px;display:flex;align-items:center;justify-content:center;gap:8px;color:#fff}
@@ -2474,13 +2446,12 @@ function goTo(panel){
   if(navEl)navEl.classList.add('active');
   document.getElementById('scroll-area').scrollTop=0;
   if(panel==='jadwal')initJadwal();
-  if(panel==='tugas'){renderTugas();if(window.onEnterSection)window.onEnterSection('tugas');}
+  if(panel==='tugas')renderTugas();
   if(panel==='nilai')renderNilai();
   if(panel==='kas'){renderKas();renderKasBayar();}
   if(panel==='presensi'){renderAbsenList();renderDaftarSiswa();renderRekapSiswa();}
-  if(panel==='pengumuman'){renderPengumuman();if(window.onEnterSection)window.onEnterSection('pengumuman');}
-  if(panel==='chat'){renderTopikList();if(window.onEnterSection)window.onEnterSection('chat');}
-  if(panel==='pengaturan'&&window._myRole==='viewer'){cfgGoTab('database');}
+  if(panel==='pengumuman')renderPengumuman();
+  if(panel==='chat')renderTopikList();
   closeSheet2('sheet-more');
 }
 
@@ -2888,7 +2859,7 @@ function renderDaftarSiswa(){
         <div style="font-size:13px;font-weight:700;color:var(--text)">${s.nama}</div>
         <div style="font-size:10px;color:var(--text3)">${s.nisn} · ${s.jk==='L'?'👦 L':'👧 P'}</div>
       </div>
-      ${window._myRole!=='viewer'?'<button class="btn btn-xs btn-ghost" onclick="hapusSiswa('+s.no+')" style="color:#f87171;border-color:rgba(239,68,68,.2)">🗑</button>':''}
+      <button class="btn btn-xs btn-ghost" onclick="hapusSiswa(${s.no})" style="color:#f87171;border-color:rgba(239,68,68,.2)">🗑</button>
     </div>`;
   }).join('');
 }
@@ -3596,7 +3567,6 @@ function renderTugas(){
   </div>`;
 }
 function toggleTugas(id){
-  if(window._myRole==='viewer'){showToast('⚠️ Siswa tidak dapat mengubah status tugas');return;}
   const t=tugasData.find(x=>x.id===id);
   if(t)t.done=!t.done;
   renderTugas();
@@ -3653,7 +3623,7 @@ function renderNilai(){
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <span class="badge ${gradeBg}">${grade}</span>
-        ${window._myRole!=='viewer'?'<button class="btn btn-xs btn-ghost" onclick="hapusNilai('+n.id+')" style="color:#f87171;font-size:10px">🗑</button>':''}
+        <button class="btn btn-xs btn-ghost" onclick="hapusNilai(${n.id})" style="color:#f87171;font-size:10px">🗑</button>
       </div>
     </div>`;
   }).join('')||`<div class="empty-state"><div class="es-icon">⭐</div><div class="es-title">Belum ada nilai</div><div class="es-sub">Tambah nilai via tab Input Nilai</div></div>`;
@@ -3671,7 +3641,7 @@ function renderNilaiInputList(){
         <div style="font-size:13px;font-weight:700;color:#fff">${n.mapel}</div>
         <div style="font-size:11px;color:var(--text3)">${n.jenis} · ${n.ket}</div>
       </div>
-      ${window._myRole!=='viewer'?'<button class="btn btn-xs btn-ghost" onclick="hapusNilai('+n.id+')" style="color:#f87171">🗑</button>':''}
+      <button class="btn btn-xs btn-ghost" onclick="hapusNilai(${n.id})" style="color:#f87171">🗑</button>
     </div>`;
   }).join('')||`<div class="empty-state"><div class="es-icon">📝</div><div class="es-title">Belum ada nilai</div><div class="es-sub">Klik tombol di atas untuk menambahkan</div></div>`;
 }
@@ -3821,14 +3791,11 @@ function filterPengumumanSheet(kat){
 function renderPengumuman(){
   const el=document.getElementById('pengumuman-list');
   if(!el)return;
-  // Gunakan data dari Firebase jika array lokal kosong
-  const src = (pengumumanData&&pengumumanData.length>0) ? pengumumanData : (window._pengumumanData||[]);
-  if(src!==pengumumanData) { pengumumanData.length=0; src.forEach(p=>pengumumanData.push(p)); }
   let list=pengFilter==='semua'?pengumumanData:pengumumanData.filter(p=>p.kat===pengFilter);
   // Pinned first
   list=[...list].sort((a,b)=>b.pin-a.pin);
   el.innerHTML=list.map(p=>`
-    <div class="peng-item" id="peng-${p.fbKey}">
+    <div class="peng-item" id="peng-${p.id}">
       <div class="peng-top">
         <div class="peng-ava" style="background:${p.warna}">${p.inisial}</div>
         <div style="flex:1;min-width:0">
@@ -3840,8 +3807,8 @@ function renderPengumuman(){
       <div class="peng-title">${p.judul}</div>
       <div class="peng-body">${p.isi}</div>
       <div style="display:flex;gap:6px;margin-top:10px">
-        <button class="btn btn-xs btn-ghost" onclick="pinPeng('${p.fbKey}')">${p.pin?'📌 Unpin':'📌 Pin'}</button>
-        <button class="btn btn-xs btn-ghost" onclick="hapusPeng('${p.fbKey}')" style="color:#f87171">🗑 Hapus</button>
+        <button class="btn btn-xs btn-ghost" onclick="pinPeng(${p.id})">${p.pin?'📌 Unpin':'📌 Pin'}</button>
+        <button class="btn btn-xs btn-ghost" onclick="hapusPeng(${p.id})" style="color:#f87171">🗑 Hapus</button>
       </div>
     </div>
   `).join('')||`<div class="empty-state"><div class="es-icon">📭</div><div class="es-title">Belum ada pengumuman</div><div class="es-sub">Buat pengumuman baru di atas</div></div>`;
@@ -3853,43 +3820,26 @@ function buatPengumuman(){
   const isi=document.getElementById('peng-isi-inp').value.trim();
   const kat=document.getElementById('peng-kat-inp').value;
   if(!judul||!isi){showToast('⚠️ Judul dan isi tidak boleh kosong!');return;}
-  fbWhenReady(async ()=>{
   const inisial=(dari||'A')[0].toUpperCase();
   const warnaMap={penting:'linear-gradient(135deg,#FF6B6B,#FF8E53)',info:'linear-gradient(135deg,#3b82f6,#1d4ed8)',kegiatan:'linear-gradient(135deg,#eab308,#ca8a04)',kelas:'linear-gradient(135deg,#a855f7,#7c3aed)'};
   const now=new Date();
-  const waktu=now.toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-  try{
-    await window._fbPush(window._fbRef(window._fbDB,'kelas11/pengumuman'),{
-      dari:dari||'Tidak diketahui',judul,isi,kat,waktu,inisial,
-      warna:warnaMap[kat]||warnaMap.info,pin:false,createdAt:Date.now()
-    });
-    document.getElementById('peng-judul-inp').value='';
-    document.getElementById('peng-dari-inp').value='';
-    document.getElementById('peng-isi-inp').value='';
-    closeSheet2('sheet-buat-peng');
-    showToast('📢 Pengumuman "'+judul.substring(0,20)+'" dikirim!');
-  }catch(e){showToast('❌ Gagal kirim: '+e.message);}
-  }); // end fbWhenReady
+  const waktu=`Hari ini, ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  pengumumanData.unshift({id:Date.now(),dari:dari||'Tidak diketahui',judul,isi,kat,waktu,inisial,warna:warnaMap[kat]||warnaMap.info,pin:false});
+  document.getElementById('peng-judul-inp').value='';
+  document.getElementById('peng-dari-inp').value='';
+  document.getElementById('peng-isi-inp').value='';
+  closeSheet2('sheet-buat-peng');
+  renderPengumuman();
+  showToast('📢 Pengumuman "'+judul.substring(0,20)+'" dikirim!');
 }
 
-async function pinPeng(fbKey){
-  const p=pengumumanData.find(x=>x.fbKey===fbKey);
-  if(!p)return;
-  fbWhenReady(async()=>{
-    try{
-      await window._fbSet(window._fbRef(window._fbDB,'kelas11/pengumuman/'+fbKey+'/pin'),!p.pin);
-      showToast(!p.pin?'📌 Pengumuman dipinned!':'📌 Pin dilepas');
-    }catch(e){showToast('❌ Gagal: '+e.message);}
-  });
+function pinPeng(id){
+  const p=pengumumanData.find(x=>x.id===id);
+  if(p){p.pin=!p.pin;renderPengumuman();showToast(p.pin?'📌 Pengumuman dipinned!':'📌 Pin dilepas');}
 }
-function hapusPeng(fbKey){
-  if(!confirm('Hapus pengumuman ini?'))return;
-  fbWhenReady(async()=>{
-    try{
-      await window._fbRemove(window._fbRef(window._fbDB,'kelas11/pengumuman/'+fbKey));
-      showToast('🗑 Pengumuman dihapus');
-    }catch(e){showToast('❌ Gagal hapus: '+e.message);}
-  });
+function hapusPeng(id){
+  const idx=pengumumanData.findIndex(x=>x.id===id);
+  if(idx>-1){pengumumanData.splice(idx,1);renderPengumuman();showToast('🗑 Pengumuman dihapus');}
 }
 
 // ═══════════════════════════════════════════
@@ -3906,24 +3856,19 @@ function filterTopik(keyword){
 function renderTopikList(keyword=''){
   const el=document.getElementById('topik-list');
   if(!el)return;
-  // Gunakan data dari Firebase jika array lokal kosong
-  const src = (topikData&&topikData.length>0) ? topikData : (window._topikData||[]);
-  if(src!==topikData) { topikData.length=0; src.forEach(t=>topikData.push(t)); }
   const list=keyword?topikData.filter(t=>t.nama.toLowerCase().includes(keyword.toLowerCase())):topikData;
   el.innerHTML=list.map(t=>{
-    const prevText=t._lastPreview||'Belum ada pesan';
-    const lastTime=t._lastTime?new Date(t._lastTime).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'';
-    const isAdmin=(window._myRole==='walikelas'||window._myRole==='pengurus');
-    return`<div class="topic-item" onclick="openChat('${t.id}')">
-      <div class="topic-icon" style="background:${t.warna}">${t.nama.substring(0,2).toUpperCase()}</div>
+    const lastMsg=t.msgs.length?t.msgs[t.msgs.length-1]:null;
+    const prevText=lastMsg?(lastMsg.me?'Kamu: ':lastMsg.from.split(' ')[0]+': ')+lastMsg.text:'Belum ada pesan';
+    return`<div class="topic-item" onclick="openChat(${t.id})">
+      <div class="topic-icon" style="background:${t.warna}">${t.nama.split(' ')[0]}</div>
       <div class="topic-info">
         <div class="tname">${t.nama}</div>
         <div class="tprev">${prevText.substring(0,45)}${prevText.length>45?'…':''}</div>
       </div>
       <div class="topic-meta">
-        <div class="ttime">${lastTime}</div>
+        <div class="ttime">${lastMsg?lastMsg.time:''}</div>
         ${t.unread?`<div class="unread-dot">${t.unread}</div>`:''}
-        ${isAdmin?`<div class="topic-menu-btn" onclick="event.stopPropagation();showTopikMenu('${t.id}',this)" style="margin-top:4px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.1);font-size:12px;cursor:pointer;color:var(--text2)">⋮</div>`:''}
       </div>
     </div>`;
   }).join('')||`<div class="empty-state"><div class="es-icon">🔍</div><div class="es-title">Topik tidak ditemukan</div></div>`;
@@ -3939,137 +3884,61 @@ function buatTopik(){
   const nama=document.getElementById('topik-nama').value.trim();
   const desc=document.getElementById('topik-desc').value.trim();
   if(!nama){showToast('⚠️ Nama topik tidak boleh kosong!');return;}
-  fbWhenReady(async ()=>{
-    try{
-      await window._fbPush(window._fbRef(window._fbDB,'kelas11/topik'),{
-        nama, desc:desc||'Topik baru', warna:selectedWarna, createdAt:Date.now()
-      });
-      document.getElementById('topik-nama').value='';
-      document.getElementById('topik-desc').value='';
-      closeSheet2('sheet-topik');
-      showToast('✨ Topik "'+nama+'" berhasil dibuat!');
-    }catch(e){showToast('❌ Gagal buat topik: '+e.message);}
-  });
+  topikData.unshift({id:Date.now(),nama,desc:desc||'Topik baru',warna:selectedWarna,unread:0,msgs:[]});
+  document.getElementById('topik-nama').value='';
+  document.getElementById('topik-desc').value='';
+  closeSheet2('sheet-topik');
+  renderTopikList();
+  showToast('✨ Topik "'+nama+'" berhasil dibuat!');
 }
-
-let _chatUnsubFn = null;
 
 function openChat(topikId){
   activeTopikId=topikId;
   const topik=topikData.find(t=>t.id===topikId);
   if(!topik)return;
+  // Reset unread
   topik.unread=0;
   renderTopikList();
   document.getElementById('chatTitle').textContent=topik.nama;
   document.getElementById('chatSub').textContent=topik.desc;
+  // Render messages
+  const msgs=document.getElementById('chatMsgs');
+  msgs.innerHTML=topik.msgs.map(m=>`
+    <div class="msg-wrap ${m.me?'me':'other'}">
+      ${!m.me?`<div class="msg-sender">${m.from}</div>`:''}
+      <div class="msg-bubble">${m.text}</div>
+      <div class="msg-time">${m.time}</div>
+    </div>
+  `).join('')||`<div style="text-align:center;padding:40px 20px;color:var(--text3);font-size:13px">Belum ada pesan. Mulai diskusi! 👋</div>`;
   document.getElementById('chatRoom').classList.add('open');
   document.body.style.overflow='hidden';
-  // Unsubscribe listener topik sebelumnya
-  if(_chatUnsubFn){_chatUnsubFn();_chatUnsubFn=null;}
-  // Subscribe realtime ke Firebase path topik ini
-  const _onValue = window._fb?.onValue;
-  const _ref     = window._fbRef;
-  const _db      = window._fbDB;
-  if(!_onValue||!_ref||!_db){showToast('❌ Firebase belum siap');return;}
-  _chatUnsubFn = _onValue(_ref(_db,'kelas11/chat/'+topikId), snap=>{
-    const msgs=document.getElementById('chatMsgs');
-    if(!msgs)return;
-    if(!snap.exists()){
-      msgs.innerHTML=`<div style="text-align:center;padding:40px 20px;color:var(--text3);font-size:13px">Belum ada pesan. Mulai diskusi! 👋</div>`;
-      return;
-    }
-    const myUID=window._myUID;
-    const items=[];
-    snap.forEach(child=>{const v=child.val();items.push({...v,key:child.key});});
-    msgs.innerHTML=items.map(m=>{
-      const isMe=(m.uid&&m.uid===myUID)||(m.nama===window._myName&&!m.uid);
-      const time=m.waktu?new Date(m.waktu).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'-';
-      return`<div class="msg-wrap ${isMe?'me':'other'}">
-        ${!isMe?`<div class="msg-sender">${m.nama||'?'}</div>`:''}
-        <div class="msg-bubble">${m.teks||''}</div>
-        <div class="msg-time">${time}</div>
-      </div>`;
-    }).join('');
-    msgs.scrollTop=msgs.scrollHeight;
-    // Update preview di topik list
-    const last=items[items.length-1];
-    if(last&&topik){topik._lastPreview=(last.uid===myUID?'Kamu: ':((last.nama||'?').split(' ')[0]+': '))+last.teks;topik._lastTime=last.waktu;}
-    renderTopikList();
-  });
+  setTimeout(()=>{msgs.scrollTop=msgs.scrollHeight},50);
 }
 
 function closeChat(){
   document.getElementById('chatRoom').classList.remove('open');
   document.body.style.overflow='';
-  if(_chatUnsubFn){_chatUnsubFn();_chatUnsubFn=null;}
   activeTopikId=null;
 }
 
-function showChatMenu(){
-  if(activeTopikId) showTopikMenu(activeTopikId, null, true);
-}
-
-// ── Popup menu topik ──
-let _topikMenuOpen=null;
-function showTopikMenu(topikId, btn, fromHeader=false){
-  // Tutup menu sebelumnya
-  document.querySelectorAll('.topik-ctx-menu').forEach(m=>m.remove());
-  if(_topikMenuOpen===topikId && !fromHeader){_topikMenuOpen=null;return;}
-  _topikMenuOpen=topikId;
-  const topik=topikData.find(t=>t.id===topikId);
-  if(!topik)return;
-  const menu=document.createElement('div');
-  menu.className='topik-ctx-menu';
-  menu.style.cssText='position:fixed;z-index:800;background:#1a1740;border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:8px;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,.6);';
-  menu.innerHTML=`
-    <div style="padding:6px 10px;font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px">${topik.nama}</div>
-    <div onclick="hapusTopik('${topikId}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;color:#f87171;font-size:13px;font-weight:700;transition:background .15s" onmouseover="this.style.background='rgba(248,113,113,.1)'" onmouseout="this.style.background='transparent'">
-      <span style="font-size:16px">🗑️</span> Hapus Topik
-    </div>
-  `;
-  // Posisi menu
-  if(btn){
-    const r=btn.getBoundingClientRect();
-    menu.style.top=(r.bottom+4)+'px';
-    menu.style.right=(window.innerWidth-r.right)+'px';
-  } else {
-    menu.style.top='60px'; menu.style.right='12px';
-  }
-  document.body.appendChild(menu);
-  setTimeout(()=>document.addEventListener('click',function _close(e){
-    if(!menu.contains(e.target)){menu.remove();_topikMenuOpen=null;document.removeEventListener('click',_close);}
-  }),100);
-}
-
-function hapusTopik(topikId){
-  if(!confirm('Hapus topik ini beserta semua pesannya?'))return;
-  document.querySelectorAll('.topik-ctx-menu').forEach(m=>m.remove());
-  fbWhenReady(async()=>{
-    try{
-      await window._fbRemove(window._fbRef(window._fbDB,'kelas11/topik/'+topikId));
-      await window._fbRemove(window._fbRef(window._fbDB,'kelas11/chat/'+topikId));
-      if(activeTopikId===topikId) closeChat();
-      showToast('🗑 Topik dihapus');
-    }catch(e){showToast('❌ Gagal hapus: '+e.message);}
-  });
-}
+function showChatMenu(){showToast('Fitur menu topik segera hadir! 🚀')}
 
 function sendMsg(){
   const inp=document.getElementById('chatInput');
   const val=inp.value.trim();
   if(!val||activeTopikId===null)return;
+  const topik=topikData.find(t=>t.id===activeTopikId);
+  if(!topik)return;
+  const now=new Date();
+  const time=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  topik.msgs.push({from:'Kamu',me:true,text:val,time});
+  const msgs=document.getElementById('chatMsgs');
+  const div=document.createElement('div');
+  div.className='msg-wrap me';
+  div.innerHTML=`<div class="msg-bubble">${val}</div><div class="msg-time">${time}</div>`;
+  msgs.appendChild(div);
   inp.value='';
-  fbWhenReady(async()=>{
-    try{
-      await window._fbPush(window._fbRef(window._fbDB,'kelas11/chat/'+activeTopikId),{
-        uid:   window._myUID,
-        nama:  window._myName||'Pengguna',
-        role:  window._myRole||'viewer',
-        teks:  val,
-        waktu: Date.now()
-      });
-    }catch(e){showToast('❌ Gagal kirim: '+e.message);inp.value=val;}
-  });
+  msgs.scrollTop=msgs.scrollHeight;
 }
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendMsg()});
 
@@ -4128,9 +3997,17 @@ function loadIconImageData(){
 
 function applyConfig(){
   // Identity
-  const g=document.getElementById('kelas-grade');if(g)g.textContent=appConfig.grade;
-  const j=document.getElementById('kelas-jurusan');if(j)j.textContent=appConfig.jurusan;
-  const t=document.getElementById('kelas-title');if(t)t.textContent=appConfig.title;
+  const g=document.getElementById('kelas-grade');if(g)g.textContent=appConfig.grade||'';
+  const j=document.getElementById('kelas-jurusan');if(j)j.textContent=appConfig.jurusan||'';
+  const t=document.getElementById('kelas-title');if(t)t.textContent=appConfig.title||'';
+  const sub=document.getElementById('kelas-subtitle');if(sub)sub.textContent=appConfig.subtitle||'';
+  // Logo: show next to title if available
+  const logoEl=document.getElementById('hero-logo-img');
+  if(logoEl){
+    const src=appConfig.logoDataUrl||window._logoDataUrl||'';
+    if(src){ logoEl.src=src; logoEl.style.display='block'; logoEl.className='hero-logo'; }
+    else { logoEl.src=''; logoEl.style.display='none'; }
+  }
   const s=document.getElementById('kelas-subtitle');if(s)s.textContent=appConfig.subtitle;
   // Watermarks
   document.querySelectorAll('.watermark').forEach(el=>{
@@ -4373,19 +4250,28 @@ function cfgPilihEmoji(emoji){
 
 // ── Simpan semua pengaturan ──
 function cfgSimpan(){
-  const grade=(document.getElementById('set-grade').value||'XI').trim();
-  const jurusan=(document.getElementById('set-jurusan').value||'Teknologi').trim();
-  const title=(document.getElementById('set-title').value||'KELAS 11 TEKNO 🚀').trim();
+  const grade=(document.getElementById('set-grade').value||'').trim();
+  const jurusan=(document.getElementById('set-jurusan').value||'').trim();
+  const title=(document.getElementById('set-title').value||appConfig.title||'').trim();
   const subtitle=(document.getElementById('set-subtitle').value||'').trim();
   appConfig.grade=grade;appConfig.jurusan=jurusan;
   appConfig.title=title;appConfig.subtitle=subtitle;
   saveConfig();applyConfig();
-  // Apply logo to hero pill (uses pre-existing img#hero-logo-img)
-  if(cfgLogoDataUrl){
-    const heroImg=document.getElementById('hero-logo-img');
-    if(heroImg){
+  // Apply logo next to title
+  const heroImg=document.getElementById('hero-logo-img');
+  if(heroImg){
+    if(cfgLogoDataUrl){
       heroImg.src=cfgLogoDataUrl;
       heroImg.style.display='block';
+      heroImg.className='hero-logo';
+      // Save for applyConfig
+      appConfig.logoDataUrl=cfgLogoDataUrl;
+      window._logoDataUrl=cfgLogoDataUrl;
+      saveConfig();
+    } else if(appConfig.logoDataUrl||window._logoDataUrl){
+      heroImg.src=appConfig.logoDataUrl||window._logoDataUrl;
+      heroImg.style.display='block';
+      heroImg.className='hero-logo';
     }
   }
   closeSheet2('sheet-pengaturan');
@@ -4504,44 +4390,6 @@ function updateDashStats(){
 // ════════════════════════════════════════════════════
 
 // ── Login / Logout ──
-// Toggle badge expand/collapse; tap expanded badge -> open panel
-let _badgeExpanded = false;
-let _badgeTimer = null;
-function toggleRoleBadge(e) {
-  const badge = document.getElementById('role-badge-global');
-  const wrap  = document.getElementById('badge-text-wrap');
-  const arrow = document.getElementById('badge-arrow');
-  if (!_badgeExpanded) {
-    // Expand
-    _badgeExpanded = true;
-    badge.style.maxWidth = '220px';
-    badge.style.padding  = '8px 16px';
-    wrap.style.opacity   = '1';
-    wrap.style.width     = 'auto';
-    arrow.style.opacity  = '1';
-    arrow.style.width    = 'auto';
-    // Auto collapse setelah 3 detik
-    clearTimeout(_badgeTimer);
-    _badgeTimer = setTimeout(() => collapseBadge(), 3000);
-  } else {
-    // Sudah expand -> buka panel
-    collapseBadge();
-    showRolePanel();
-  }
-}
-function collapseBadge() {
-  const badge = document.getElementById('role-badge-global');
-  const wrap  = document.getElementById('badge-text-wrap');
-  const arrow = document.getElementById('badge-arrow');
-  _badgeExpanded = false;
-  clearTimeout(_badgeTimer);
-  badge.style.maxWidth = '36px';
-  badge.style.padding  = '8px';
-  wrap.style.opacity   = '0';
-  wrap.style.width     = '0';
-  arrow.style.opacity  = '0';
-  arrow.style.width    = '0';
-}
 function showRolePanel() {
   const ov = document.getElementById('overlay-role-panel');
   if(ov){ ov.style.display='flex'; ov.style.zIndex='500'; }
@@ -4560,16 +4408,6 @@ function closeRolePanel(e) {
   }
 }
 function refreshRolePanelUI() {
-  // Tampilkan hint kode jika ?dev ada di URL
-  const hint = document.getElementById('dev-login-hint');
-  if(hint && location.search.includes('dev')){
-    hint.style.display='block';
-    const wk = document.getElementById('hint-wk');
-    const pg = document.getElementById('hint-pg');
-    const k = window._roleKeys||{};
-    if(wk) wk.textContent = k.walikelas||'sinergi2026';
-    if(pg) pg.textContent = k.pengurus||'pengurus2026';
-  }
   const role  = window._myRole  || 'viewer';
   const name  = window._myName  || 'Siswa';
   const icons  = { viewer:'👁️', pengurus:'⚙️', walikelas:'👩‍🏫' };
@@ -4603,17 +4441,12 @@ function doLogin() {
   const kode = (document.getElementById('login-kode')?.value||'').trim();
   if (!name) { showToast('⚠️ Isi nama kamu dulu!'); return; }
   if (!kode) { showToast('⚠️ Masukkan kode rahasia!'); return; }
-  // Ambil keys: prioritas Firebase, fallback hardcode
   const keys = window._roleKeys || {};
-  const wkKey = (keys.walikelas || 'sinergi2026').trim();
-  const pgKey = (keys.pengurus  || 'pengurus2026').trim();
-  const inputKode = kode.trim();
-  console.log('[LOGIN] input:', JSON.stringify(inputKode), '| wk:', JSON.stringify(wkKey), '| match:', inputKode===wkKey);
   let role = null;
-  if (inputKode === wkKey) role = 'walikelas';
-  else if (inputKode === pgKey) role = 'pengurus';
+  if (kode === keys.walikelas) role = 'walikelas';
+  else if (kode === keys.pengurus) role = 'pengurus';
   if (!role) {
-    showToast('❌ Kode salah! Cek kode dari Wali Kelas.');
+    showToast('❌ Kode salah! Hubungi Wali Kelas.');
     const inp = document.getElementById('login-kode');
     if(inp){ inp.style.border='1px solid #f87171'; setTimeout(()=>inp.style.border='1px solid rgba(255,255,255,.15)',2000); }
     return;
@@ -4808,215 +4641,5 @@ function refreshLsStats(){
     }
   }, 3000);
 })();
-
-// ══════════════════════════════════════════════
-// SISTEM NOTIFIKASI BADGE + SOUND
-// ══════════════════════════════════════════════
-window._notifCounts = { chat: 0, pengumuman: 0, tugas: 0 };
-window._notifLastSeen = JSON.parse(localStorage.getItem('notif_seen') || '{"chat":0,"pengumuman":0,"tugas":0}');
-window._notifInitDone = false;
-
-// Sound notifikasi pakai Web Audio API
-let _audioCtx = null;
-
-// Aktifkan AudioContext saat user pertama kali interaksi (wajib di browser modern)
-function _initAudio() {
-  if (_audioCtx) return;
-  try {
-    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    // Resume jika suspended
-    if (_audioCtx.state === 'suspended') _audioCtx.resume();
-  } catch(e) {}
-}
-// Attach ke interaksi - agresif untuk mobile
-function _unlockAudio() {
-  _initAudio();
-  if (_audioCtx && _audioCtx.state === 'suspended') {
-    _audioCtx.resume().then(() => {
-      // Test silent buffer - wajib untuk iOS unlock
-      const buf = _audioCtx.createBuffer(1, 1, 22050);
-      const src = _audioCtx.createBufferSource();
-      src.buffer = buf;
-      src.connect(_audioCtx.destination);
-      src.start(0);
-    }).catch(()=>{});
-  }
-}
-['touchstart','touchend','mousedown','keydown','click'].forEach(ev => {
-  document.addEventListener(ev, _unlockAudio, { passive: true });
-});
-
-function playNotifSound() {
-  try {
-    if (!_audioCtx) _initAudio();
-    if (!_audioCtx) return;
-    if (_audioCtx.state === 'suspended') _audioCtx.resume();
-    const now = _audioCtx.currentTime;
-    // Nada pertama
-    const osc1 = _audioCtx.createOscillator();
-    const gain1 = _audioCtx.createGain();
-    osc1.connect(gain1); gain1.connect(_audioCtx.destination);
-    osc1.type = 'sine';
-    osc1.frequency.value = 880;
-    gain1.gain.setValueAtTime(0.4, now);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-    osc1.start(now); osc1.stop(now + 0.25);
-    // Nada kedua (lebih tinggi)
-    const osc2 = _audioCtx.createOscillator();
-    const gain2 = _audioCtx.createGain();
-    osc2.connect(gain2); gain2.connect(_audioCtx.destination);
-    osc2.type = 'sine';
-    osc2.frequency.value = 1320;
-    gain2.gain.setValueAtTime(0.0, now + 0.15);
-    gain2.gain.linearRampToValueAtTime(0.4, now + 0.25);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-    osc2.start(now + 0.15); osc2.stop(now + 0.55);
-  } catch(e) { console.warn('Sound error:', e); }
-}
-
-function setMenuBadge(key, count) {
-  // Update semua elemen dengan id icon-{key} (home grid + bottom nav)
-  const targets = document.querySelectorAll(`#icon-${key}`);
-  targets.forEach(el => {
-    // Cari atau buat badge di parent .qa
-    const qa = el.closest('.qa') || el.parentElement;
-    if (!qa) return;
-    let badge = qa.querySelector('.notif-badge');
-    if (count > 0) {
-      if (!badge) {
-        badge = document.createElement('div');
-        badge.className = 'notif-badge pulse';
-        qa.appendChild(badge);
-      }
-      badge.textContent = count > 99 ? '99+' : count;
-      badge.className = 'notif-badge pulse';
-    } else {
-      if (badge) badge.remove();
-    }
-  });
-  window._notifCounts[key] = count;
-}
-
-function clearMenuBadge(key) {
-  window._notifLastSeen[key] = Date.now();
-  localStorage.setItem('notif_seen', JSON.stringify(window._notifLastSeen));
-  setMenuBadge(key, 0);
-}
-
-// Panggil saat masuk ke section
-function onEnterSection(key) {
-  clearMenuBadge(key);
-}
-
-// ── Listen perubahan chat (hitung pesan baru per topik) ──
-function listenNotifChat() {
-  const _onValue = window._fb?.onValue;
-  const _ref     = window._fbRef;
-  const _db      = window._fbDB;
-  if (!_onValue || !_ref || !_db) return;
-
-  _onValue(_ref(_db, 'kelas11/chat'), snap => {
-    if (!snap.exists()) { setMenuBadge('chat', 0); return; }
-    const lastSeen = window._notifLastSeen.chat || 0;
-    let newCount = 0;
-    snap.forEach(topik => {
-      topik.forEach(msg => {
-        const v = msg.val();
-        if ((v.waktu || 0) > lastSeen && v.uid !== window._myUID) newCount++;
-      });
-    });
-    const prev = window._notifCounts.chat || 0;
-    if (window._notifInitDone && newCount > prev) playNotifSound();
-    setMenuBadge('chat', newCount);
-  });
-}
-
-// ── Listen perubahan pengumuman ──
-function listenNotifPengumuman() {
-  const _onValue = window._fb?.onValue;
-  const _ref     = window._fbRef;
-  const _db      = window._fbDB;
-  if (!_onValue || !_ref || !_db) return;
-
-  _onValue(_ref(_db, 'kelas11/pengumuman'), snap => {
-    if (!snap.exists()) { setMenuBadge('pengumuman', 0); return; }
-    const lastSeen = window._notifLastSeen.pengumuman || 0;
-    let newCount = 0;
-    snap.forEach(child => {
-      const v = child.val();
-      if ((v.createdAt || 0) > lastSeen) newCount++;
-    });
-    const prev = window._notifCounts.pengumuman || 0;
-    if (window._notifInitDone && newCount > prev) playNotifSound();
-    setMenuBadge('pengumuman', newCount);
-  });
-}
-
-// ── Listen perubahan tugas ──
-function listenNotifTugas() {
-  const _onValue = window._fb?.onValue;
-  const _ref     = window._fbRef;
-  const _db      = window._fbDB;
-  if (!_onValue || !_ref || !_db) return;
-
-  _onValue(_ref(_db, 'kelas11/tugas'), snap => {
-    if (!snap.exists()) { setMenuBadge('tugas', 0); return; }
-    const lastSeen = window._notifLastSeen.tugas || 0;
-    let newCount = 0;
-    const d = snap.val();
-    if (d?.tugas) {
-      d.tugas.forEach(t => {
-        if ((t.createdAt || t.deadline || 0) > lastSeen) newCount++;
-      });
-    }
-    const prev = window._notifCounts.tugas || 0;
-    if (window._notifInitDone && newCount > prev) playNotifSound();
-    setMenuBadge('tugas', newCount);
-  });
-}
-
-// Inisialisasi semua listener notifikasi (dipanggil setelah Firebase ready)
-function initNotifListeners() {
-  listenNotifChat();
-  listenNotifPengumuman();
-  listenNotifTugas();
-  // Tandai init selesai setelah delay singkat (hindari sound saat load awal)
-  setTimeout(() => { window._notifInitDone = true; }, 2500);
-}
-
-window.clearMenuBadge   = clearMenuBadge;
-window.onEnterSection   = onEnterSection;
-window.initNotifListeners = initNotifListeners;
-window.playNotifSound   = playNotifSound;
-
-// ── Expose non-module render functions ke window (dipanggil oleh Firebase listeners) ──
-window.renderTopikList        = renderTopikList;
-window.renderPengumuman       = renderPengumuman;
-window.filterTopik            = filterTopik;
-window.filterPengumuman       = filterPengumuman;
-window.filterPengumumanSheet  = filterPengumumanSheet;
-window.pickWarna              = pickWarna;
-window.buatTopik              = buatTopik;
-window.buatPengumuman         = buatPengumuman;
-window.pinPeng                = pinPeng;
-window.hapusPeng              = hapusPeng;
-// ── Login functions ──
-window.doLogin                = doLogin;
-window.logoutRole             = logoutRole;
-window.togglePwVis            = togglePwVis;
-window.showRolePanel          = showRolePanel;
-window.closeRolePanel         = closeRolePanel;
-window.refreshRolePanelUI     = refreshRolePanelUI;
-// ── Chat functions (dari non-module) ──
-window.openChat               = openChat;
-window.closeChat              = closeChat;
-window.sendMsg                = sendMsg;
-window.showChatMenu           = showChatMenu;
-window.showTopikMenu          = showTopikMenu;
-window.hapusTopik             = hapusTopik;
-
-// Jika Firebase sudah terhubung sebelum script ini jalan, trigger render ulang
-if(window._topikData)     { topikData.length=0; window._topikData.forEach(t=>topikData.push(t)); renderTopikList(); }
-if(window._pengumumanData){ pengumumanData.length=0; window._pengumumanData.forEach(p=>pengumumanData.push(p)); renderPengumuman(); }
 
 </script>
